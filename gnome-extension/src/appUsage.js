@@ -67,6 +67,8 @@ export class AppUsage {
         this._watchInhibitor();
         this._syncIdle();
         this._reportTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, REPORT_MS, () => {
+            // The stretch so far goes too, so each report carries the whole last minute.
+            this._reports.add(this._session.flush());
             this._flush();
             return GLib.SOURCE_CONTINUE;
         });

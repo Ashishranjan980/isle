@@ -177,10 +177,18 @@ class AppsPage extends Page {
         return row;
     }
 
-    /** The page is on screen: send what is timed so far, ask for the totals, then once a minute. */
+    /** The page is on screen: send what is timed so far, ask for the totals, then ask once a minute. */
     onActivate() {
+        // Opening sends the stretch being timed; the minutes after only ask. The tracker's own timer
+        // is the one sender then, so a report never goes twice in a minute because the page is open.
+        this._refresh({flush: true});
+        this.later('refresh', 60000, () => this._tick());
+    }
+
+    /** While shown, asks again once a minute; the tracker sends its own report on its timer. */
+    _tick() {
         this._refresh();
-        this.later('refresh', 60000, () => this.onActivate());
+        this.later('refresh', 60000, () => this._tick());
     }
 
     /** Nothing is asked or rebuilt while it is closed. */
@@ -194,8 +202,9 @@ class AppsPage extends Page {
             this._refresh();
     }
 
-    async _refresh() {
-        await this._tracker?.flush();
+    async _refresh({flush = false} = {}) {
+        if (flush)
+            await this._tracker?.flush();
         if (!this.active || this._destroyed)
             return;
         const result = await this.daemon.call('appUsage', 'GetStats');

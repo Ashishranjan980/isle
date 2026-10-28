@@ -113,6 +113,27 @@ test('reports merge a stretch that goes on with the same app, and drop flicks', 
     assert.equal(reports.size, 0);
 });
 
+test('a stretch flushed every minute goes out as one report', () => {
+    const time = clock();
+    const session = new AppUsageSession(time.now, time.wall);
+    const reports = new AppUsageReports();
+    session.switchTo(BRAVE);
+    // The tracker's minute timer flushes the running stretch into the buffer each time.
+    for (let i = 0; i < 3; i++) {
+        time.advance(60_000);
+        reports.add(session.flush());
+    }
+    // A focus change and its flush join the same stretch: the app was in front the whole time.
+    time.advance(30_000);
+    reports.add(session.switchTo(CODE, time.now(), time.wall()));
+    time.advance(60_000);
+    reports.add(session.flush());
+    assert.deepEqual(reports.take(), [
+        {...BRAVE, start: WALL, ms: 3 * 60_000 + 30_000},
+        {...CODE, start: WALL + 3 * 60_000 + 30_000, ms: 60_000},
+    ]);
+});
+
 test('reports keep different apps, names and untouching stretches apart', () => {
     const reports = new AppUsageReports();
     reports.add({...BRAVE, start: WALL, ms: 1_000});
