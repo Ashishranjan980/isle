@@ -792,6 +792,7 @@
   border-radius: 7px;
   background-color: rgba(255, 255, 255, 0.07);
 }
+.isle-cal-world-icon { width: 16px; height: 16px; }
 .isle-cal-world-city { font-size: 13px; font-weight: 600; }
 .isle-cal-world-meta { font-size: 11px; font-weight: 500; color: rgba(255, 255, 255, 0.55); }
 .isle-cal-world-time { font-size: 13px; font-weight: 600; font-feature-settings: "tnum"; }

@@ -4,6 +4,7 @@
 // Calendar as a widget shows it: the month, and the chosen day's events from the desktop's
 // calendars (GNOME Shell's event source) and Isle's own (isled, removable).
 
+import Cairo from 'cairo';
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
@@ -60,6 +61,51 @@ function dateTime(date) {
 function timeText(date) {
     return Format.timeOfDay(dateTime(date));
 }
+
+/** Sun or moon for a world-clock row. Still: it is painted when the city changes from day to night. */
+const WorldDayIcon = GObject.registerClass(
+class WorldDayIcon extends St.DrawingArea {
+    _init() {
+        super._init({style_class: 'isle-cal-world-icon', y_align: Clutter.ActorAlign.CENTER});
+        this._night = false;
+    }
+
+    /** `night` is that city's local hour before 6 or from 19. */
+    setNight(night) {
+        if (night === this._night)
+            return;
+        this._night = night;
+        this.queue_repaint();
+    }
+
+    vfunc_repaint() {
+        const cr = this.get_context();
+        const [width, height] = this.get_surface_size();
+        const size = Math.min(width, height);
+        const x = width / 2;
+        const y = height / 2;
+        cr.setSourceRGBA(1, 1, 1, 0.92);
+        if (this._night) {
+            cr.setFillRule(Cairo.FillRule.EVEN_ODD);
+            cr.arc(x - size * 0.04, y, size * 0.36, 0, Math.PI * 2);
+            cr.newSubPath();
+            cr.arc(x + size * 0.14, y - size * 0.1, size * 0.3, 0, Math.PI * 2);
+            cr.fill();
+        } else {
+            cr.arc(x, y, size * 0.22, 0, Math.PI * 2);
+            cr.fill();
+            cr.setLineWidth(Math.max(1, size * 0.07));
+            cr.setLineCap(Cairo.LineCap.ROUND);
+            for (let i = 0; i < 8; i++) {
+                const angle = (Math.PI * 2 * i) / 8;
+                cr.moveTo(x + Math.cos(angle) * size * 0.32, y + Math.sin(angle) * size * 0.32);
+                cr.lineTo(x + Math.cos(angle) * size * 0.46, y + Math.sin(angle) * size * 0.46);
+            }
+            cr.stroke();
+        }
+        cr.$dispose();
+    }
+});
 
 /** An alarm's wait is cut into naps this long at most: a sleeping computer stops the time-outs' clock. */
 const ALARM_NAP_MS = 30 * 1000;
@@ -351,6 +397,8 @@ export const CalendarPage = GObject.registerClass({
                 this._worldStrip.child.add_child(chip);
             }
             const row = new St.BoxLayout({style_class: 'isle-cal-world-row'});
+            clock.icon = new WorldDayIcon();
+            row.add_child(clock.icon);
             const city = label(name, 'isle-cal-world-city', {x_expand: true});
             city.clutter_text.ellipsize = Pango.EllipsizeMode.END;
             row.add_child(city);
@@ -378,11 +426,13 @@ export const CalendarPage = GObject.registerClass({
             if (text && text.text !== value)
                 text.text = value;
         };
-        for (const {timezone, chipTime, meta, time} of this._worldClocks) {
-            const shown = Format.timeOfDay(now.to_timezone(timezone));
+        for (const {timezone, chipTime, meta, time, icon} of this._worldClocks) {
+            const there = now.to_timezone(timezone);
+            const shown = Format.timeOfDay(there);
             set(chipTime, shown);
             set(time, shown);
             set(meta, [WorldClocks.dayText(timezone, now), WorldClocks.offsetText(timezone, now)].filter(Boolean).join(' · '));
+            icon?.setNight(there.get_hour() < 6 || there.get_hour() >= 19);
         }
         if (this.active)
             this.later('world', (60 - now.get_seconds()) * 1000 + 50, () => this._tickWorld());
