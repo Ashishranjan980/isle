@@ -99,6 +99,17 @@ const INTERFACES = {
             <property name="Items" type="s" access="read"/>`),
         properties: {Items: 'reminders'},
     },
+    appUsage: {
+        xml: node('AppUsage1', `
+            <method name="Report">
+                <arg name="app_id" type="s" direction="in"/>
+                <arg name="name" type="s" direction="in"/>
+                <arg name="ms" type="x" direction="in"/>
+            </method>
+            <method name="Clear"/>
+            <property name="Stats" type="s" access="read"/>`),
+        properties: {Stats: 'appUsage'},
+    },
     usage: {
         xml: node('Usage1', `
             <method name="SetConfig"><arg name="config" type="s" direction="in"/></method>

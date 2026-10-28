@@ -33,6 +33,7 @@ const TABS = {
     reminders: {icon: 'isle-tasks', label: 'Reminders'},
     shelf: {icon: 'isle-shelf', label: 'Shelf'},
     calendar: {icon: 'isle-calendar', label: 'Calendar'},
+    apps: {icon: 'isle-apps', label: 'Apps'},
     usage: {icon: 'isle-gauge', label: 'Usage'},
 };
 /** How bright a tab's icon is: open, under the pointer, otherwise. */

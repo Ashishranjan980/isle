@@ -23,6 +23,7 @@ const DAEMON = 'io.github.zickrian.isle.Daemon';
 const DAEMON_PATH = '/io/github/zickrian/isle/Daemon';
 const POMODORO_INTERFACE = 'io.github.zickrian.isle.Pomodoro1';
 const CLIPBOARD_INTERFACE = 'io.github.zickrian.isle.Clipboard1';
+const APP_USAGE_INTERFACE = 'io.github.zickrian.isle.AppUsage1';
 const AGENTS_INTERFACE = 'io.github.zickrian.isle.Agents1';
 const ASSISTANT_INTERFACE = 'io.github.zickrian.isle.Assistant1';
 /** Edits to the timer are sent once typing pauses for this long. */
@@ -334,6 +335,7 @@ export default class IslePreferences extends ExtensionPreferences {
         look.add(delay);
         page.add(look);
         page.add(pagesGroup(settings, window));
+        page.add(appUsageGroup(window));
         page.add(worldClocksGroup(settings, window));
 
         const alerts = new Adw.PreferencesGroup({title: 'Alerts'});
@@ -748,6 +750,7 @@ const PAGES = [
     ['reminders', 'Reminders', 'object-select-symbolic', 'Your to-do list'],
     ['shelf', 'Shelf', 'edit-paste-symbolic', 'Clipboard history (Super+V) and the files tray'],
     ['calendar', 'Calendar', 'x-office-calendar-symbolic', 'The month, its events and world clocks'],
+    ['apps', 'Apps', 'view-app-grid-symbolic', 'Time spent in each application, today, over the last 7 days or the last 30'],
 ];
 
 /** A switch per page; the last one on can't be turned off, so the island always has a page. */
@@ -794,6 +797,25 @@ function pagesGroup(settings, window) {
         return false;
     });
     sync();
+    return group;
+}
+
+/** Forgets the app usage kept so far; the page keeps timing afterwards. */
+function appUsageGroup(window) {
+    const group = new Adw.PreferencesGroup({
+        title: 'App Usage',
+        description: 'Timed while the Apps page is on, and kept on this computer for 30 days.',
+    });
+    const clear = new Adw.ActionRow({title: 'Clear app usage', subtitle: 'Forget every day recorded so far'});
+    const button = new Gtk.Button({label: 'Clear…', valign: Gtk.Align.CENTER});
+    button.connect('clicked', () => confirm(window, {
+        heading: 'Clear app usage?',
+        body: 'Every app\'s time recorded so far is removed. This cannot be undone.',
+        action: 'Clear',
+    }, () => Gio.DBus.session.call(DAEMON, DAEMON_PATH, APP_USAGE_INTERFACE, 'Clear', null, null,
+        Gio.DBusCallFlags.NONE, -1, null, null)));
+    clear.add_suffix(button);
+    group.add(clear);
     return group;
 }
 

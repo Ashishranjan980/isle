@@ -69,9 +69,11 @@ export function ago(dateTime) {
     return dateTime.format(minutes < 6 * 24 * 60 ? '%a' : '%-d %b');
 }
 
-/** A span of time as "1h 15m", "25m" or "0m". */
+/** A span of time as "1h 15m", "25m", "<1m" or "0m". */
 export function hoursMinutes(ms) {
     const minutes = Math.round(ms / 60000);
+    if (!minutes)
+        return ms > 0 ? '<1m' : '0m';
     const hours = Math.floor(minutes / 60);
     if (!hours)
         return `${minutes}m`;

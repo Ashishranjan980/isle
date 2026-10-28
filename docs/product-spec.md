@@ -11,6 +11,7 @@ disagrees with this document is a bug in one or the other; fix both together.
 | control music without switching windows | open on hover with cover, scrubber, controls; sing along with synced lyrics |
 | keep an eye on a call while I work in another window | show calls from any app or browser: their length in the closed island, a live preview of the call, mute and a way back |
 | focus in blocks | run a Pomodoro timer that stays visible while closed and chimes at the end |
+| know where my time goes | time the app in front, and show it today, over the last seven days or the last 30 |
 | not forget small tasks | write them down in one line, tick them off; tasks survive reboots and power cuts |
 | move files between apps | park files on the island and drag them out later |
 | know when something changes | show short, consistent alerts: charging, battery, losing the connection, earbuds, volume, brightness, Caps Lock |
@@ -119,8 +120,8 @@ call starts → Call during a call → Notifications if some arrived unseen
 runs → Music.
 
 Pages, in order: **Call** (only during a call) **· Music · Notifications ·
-Focus · Reminders · Shelf · Calendar · Usage** (Usage only with an AI plan found), one tab each in the header. Lists scroll with the wheel or touchpad and never show
-a scrollbar.
+Focus · Reminders · Shelf · Calendar · Apps · Usage** (Usage only with an AI plan found), one tab each in the header.
+Lists scroll with the wheel or touchpad and never show a scrollbar.
 
 ## 4. Closed island
 
@@ -330,6 +331,21 @@ Accounts such as Google; blue; to read, not to click) and Isle's own
 (orange; × on hover to remove), kept by `isled` and forgotten after 400
 days.
 
+**Apps** (title "App Usage"): where the time went. On the left the title,
+then how long the period's apps were in front ("2h 34m today"); on the
+right a segmented **Today** / **7 days** / **30 days** switch. Below, one row
+per app,
+most used first: its icon, name, a thin white bar against the most used
+app, and its time ("1h 12m", or "<1m" under a minute). Rows scroll with the
+wheel or touchpad. Empty:
+"No usage yet · Time in the app in front shows up here". Only the
+application in front is timed, and only while someone is at the computer:
+time without input for a minute is not counted. A stretch is sent to
+`isled` as focus moves, when you go idle or come back, as the screen locks,
+and as the page opens; nothing polls while it is closed. `isled` keeps 30
+days in `~/.local/share/isle/app-usage.json`; turning the Apps page off in
+Settings stops the timing and sends what it had.
+
 ## 6. Alerts
 
 One at a time. *Instant* alerts replace whatever is showing; the rest queue
@@ -478,6 +494,7 @@ hovering opens the Notifications page.
   live in `~/.local/share/isle/*.json`,
   written atomically and flushed to disk (file and folder), so they survive
   reboots and power cuts. A corrupt file is set aside, never lost silently.
+  App usage is kept the same way in `app-usage.json`, for 30 days.
 - Lyrics and cover art are cached in `~/.cache/isle`.
 - `isled` restarts on failure (systemd); the extension reconnects on its own.
 
@@ -496,6 +513,10 @@ hovering opens the Notifications page.
 - The bot in the closed island is drawn once and moves only while the assistant works.
 - Animations run on the display's frame clock only while a spring moves.
 - The open island ticks only the visible page (scrubber 4×/s, timer 1×/s).
+- App usage is event driven: the shell says when focus changes or the user
+  goes idle, and the extension sends the stretch then; the Apps page asks
+  once a minute only while it is on screen. Nothing is polled or timed
+  while the page is closed.
 - Calls are found from the shell's own audio events, never polled. The
   call's length ticks once a second only while it is on screen; the call
   preview reuses the window's picture and exists only while the Call page

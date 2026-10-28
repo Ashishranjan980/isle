@@ -53,6 +53,15 @@ pub fn today() -> String {
     Local::now().date_naive().to_string()
 }
 
+/// The last `count` days in local time, oldest first and today last.
+pub fn days_back(count: u32) -> Vec<String> {
+    let today = Local::now().date_naive();
+    (0..count)
+        .rev()
+        .map(|back| (today - chrono::Duration::days(i64::from(back))).to_string())
+        .collect()
+}
+
 /// Start of today in local time, in milliseconds since the Unix epoch.
 pub fn start_of_today() -> i64 {
     local_midnight(Local::now().date_naive()).unwrap_or(0)

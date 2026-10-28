@@ -117,7 +117,7 @@
     <key name="hidden-pages" type="as">
       <default>[]</default>
       <summary>Pages left out of the island</summary>
-      <description>Names of the open island’s pages that have no tab: music, notifications, focus, reminders, shelf, calendar.</description>
+      <description>Names of the open island’s pages that have no tab: music, notifications, focus, reminders, shelf, calendar, apps. A page left out takes what it alone does with it: the Apps page stops timing app usage.</description>
     </key>
     <key name="agent-alerts-claude" type="b">
       <default>true</default>

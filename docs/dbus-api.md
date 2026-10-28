@@ -136,6 +136,19 @@ when it is due, then dismisses it.
 | `Dismiss(t id)` | | Forgets one, once shown (or cancelled). |
 | `Items` | `s` | `[{id, text, due_ms}]`, soonest first. |
 
+## io.github.zickrian.isle.AppUsage1
+
+Time spent in each application, timed by the extension as GNOME's focus
+changes and kept in `~/.local/share/isle/app-usage.json` for 30 days. Only
+the application in front is timed, and time without input for a minute is
+not counted. Turning the Apps page off in Settings stops the timing.
+
+| Member | Signature | |
+|---|---|---|
+| `Report(s app_id, s name, x ms)` | | Adds a stretch of `ms` to `app_id`, named `name`, on today. `app_id` is the desktop id (or `window:<wmclass>` when the app has no desktop file). A blank id, or a time not between 1 ms and 24 hours, is refused with `InvalidArgs`. |
+| `Clear()` | | Forgets every day. |
+| `Stats` | `s` | `{today: [{id, name, ms}], week: [{id, name, ms}], month: [{id, name, ms}]}`, most used first; `week` is the last seven days including today, and `month` the last 30 (all that is kept). |
+
 ## io.github.zickrian.isle.Assistant1
 
 The voice assistant. isled records the microphone, turns speech into text

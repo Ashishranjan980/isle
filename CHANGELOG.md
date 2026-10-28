@@ -6,6 +6,14 @@ All notable changes to Isle are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- App usage: an Apps page in the open island times the application in front and shows it today, over
+  the last seven days or the last 30, most used first, with each app's icon and time. Time while you
+  are away is not counted; turning the page off in Settings stops the timing. The days are kept only
+  on this computer, for 30 days. It is event driven: focus changes and going idle send a stretch, and
+  the page asks once a minute only while it is open.
+
 ## [1.4.0] - 2026-10-27
 
 ### Added
