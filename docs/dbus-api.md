@@ -140,8 +140,10 @@ when it is due, then dismisses it.
 
 Time spent in each application, timed by the extension as GNOME's focus
 changes and kept in `~/.local/share/isle/app-usage.json` for 30 days. Only
-the application in front is timed, and time without input for a minute is
-not counted. Turning the Apps page off in Settings stops the timing.
+the application in front is timed, whether or not there is keyboard or
+pointer input; it stops when focus moves, when no window is in front, or
+when the screen locks. Turning the Apps page off in Settings stops the
+timing.
 
 | Member | Signature | |
 |---|---|---|

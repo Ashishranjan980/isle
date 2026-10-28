@@ -339,12 +339,13 @@ most used first: its icon, name, a thin white bar against the most used
 app, and its time ("1h 12m", or "<1m" under a minute). Rows scroll with the
 wheel or touchpad. Empty:
 "No usage yet · Time in the app in front shows up here". Only the
-application in front is timed, and only while someone is at the computer:
-time without input for a minute is not counted. A stretch is sent to
-`isled` as focus moves, when you go idle or come back, as the screen locks,
-and as the page opens; nothing polls while it is closed. `isled` keeps 30
-days in `~/.local/share/isle/app-usage.json`; turning the Apps page off in
-Settings stops the timing and sends what it had.
+application in front is timed, whether or not there is keyboard or pointer
+input; it stops when focus moves to another application, when no window is
+in front, or when the screen locks. A stretch is sent to `isled` as focus
+moves, as the screen locks, and as the page opens; nothing polls while it
+is closed. `isled` keeps 30 days in `~/.local/share/isle/app-usage.json`;
+turning the Apps page off in Settings stops the timing and sends what it
+had.
 
 ## 6. Alerts
 
@@ -513,10 +514,10 @@ hovering opens the Notifications page.
 - The bot in the closed island is drawn once and moves only while the assistant works.
 - Animations run on the display's frame clock only while a spring moves.
 - The open island ticks only the visible page (scrubber 4×/s, timer 1×/s).
-- App usage is event driven: the shell says when focus changes or the user
-  goes idle, and the extension sends the stretch then; the Apps page asks
-  once a minute only while it is on screen. Nothing is polled or timed
-  while the page is closed.
+- App usage is event driven: the shell says when focus changes, and the
+  extension sends the stretch then; the Apps page asks once a minute only
+  while it is on screen. Nothing is polled or timed while the page is
+  closed.
 - Calls are found from the shell's own audio events, never polled. The
   call's length ticks once a second only while it is on screen; the call
   preview reuses the window's picture and exists only while the Call page
