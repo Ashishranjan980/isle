@@ -130,6 +130,12 @@ appear in the same place instead of in the middle of the screen.
 <b>AI agents.</b> When Claude Code or Codex asks permission to run something, answer from the island: <b>Deny</b>, <b>Allow</b> or, for Claude Code, <b>Always</b>. When one is done, the island says what it did. Nothing shows while you are in its window, and answering in its terminal works as before.
 </td>
 </tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/images/apps.png" alt="Apps page: Brave Web Browser, Visual Studio Code, Spotify and Files with their times today" width="100%"><br>
+<b>App usage.</b> Where your time goes: the application in front today, over the last seven days, or the last 30, with its icon, a bar and its time. Time counts while the app stays focused, even when you are not typing or clicking; locking the screen stops it.
+</td>
+</tr>
 </table>
 
 Also: privacy dots while the camera, microphone or screen sharing is in use,
