@@ -165,9 +165,20 @@ mod tests {
         usage.record("2026-10-20", "app.desktop", "  Two\n lines\t ", 1_000);
         usage.record("2026-10-20", "other.desktop", "  ", 1_000);
         let totals = usage.totals(["2026-10-20"]);
-        assert_eq!(totals.iter().find(|app| app.id == "app.desktop").unwrap().name, "Two lines");
         assert_eq!(
-            totals.iter().find(|app| app.id == "other.desktop").unwrap().name,
+            totals
+                .iter()
+                .find(|app| app.id == "app.desktop")
+                .unwrap()
+                .name,
+            "Two lines"
+        );
+        assert_eq!(
+            totals
+                .iter()
+                .find(|app| app.id == "other.desktop")
+                .unwrap()
+                .name,
             "other.desktop"
         );
     }

@@ -102,7 +102,10 @@ pub async fn run(iface: InterfaceRef<AppUsageService>) {
         }
         let mut service = iface.get_mut().await;
         let keep = days_back(KEEP_DAYS);
-        if keep.first().is_some_and(|oldest| service.usage.prune(oldest)) {
+        if keep
+            .first()
+            .is_some_and(|oldest| service.usage.prune(oldest))
+        {
             service.store.save(&service.usage);
         }
         if let Err(err) = service.stats_changed(iface.signal_emitter()).await {
