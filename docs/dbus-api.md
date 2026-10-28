@@ -38,6 +38,12 @@ that played last. Another player starting to play ends the pick.
 
 The position is only sampled when something changes. While playing, the
 current position is `position_us + (now - sampled_at_ms) * 1000 * rate`.
+A player that reports position 0 while it is still playing (Firefox and Zen do)
+does not move that sample; a `Seeked` signal does, and its position is the one
+kept. A length that disappears for the same track is kept. While playing with
+no length yet, isled reads the player again after 1s and after 3s. A relative
+seek, used when the player gives no track id, is measured from this position
+when the player's own `Position` read is 0.
 
 The control methods only fail when no player is running. They return
 without waiting for the player, so a slow player cannot hold the daemon up;

@@ -81,8 +81,13 @@ pub trait App {
 
 /// What the watch loop is woken for, besides bus names and wishes from the extension.
 enum Event {
-    /// A player's properties changed or it seeked.
-    Player(OwnedBusName),
+    /// A player's properties changed. `seeked` is the position from a `Seeked` in that same burst.
+    Player {
+        name: OwnedBusName,
+        seeked: Option<i64>,
+    },
+    /// `mpris:length` was still missing; read the player again.
+    LengthRetry(OwnedBusName),
     /// A cover art download finished, successfully or not.
     ArtDone { url: String, ok: bool },
     /// The result of lyrics lookup number `lookup`.
@@ -110,6 +115,8 @@ struct Snapshot {
     can_go_previous: bool,
     can_play_pause: bool,
     can_seek: bool,
+    /// `Position` was in the read. Absent is not the same as a reported 0.
+    position_known: bool,
 }
 
 /// One player being watched.
@@ -122,6 +129,10 @@ struct Entry {
     /// Order in which players last started playing; the latest one wins.
     started_playing: u64,
     listener: AbortHandle,
+    /// Re-reads while the track's length is still unknown, at most two.
+    length_tries: u8,
+    /// A length re-read is already waiting.
+    length_waiting: bool,
 }
 
 impl Drop for Entry {
@@ -219,7 +230,13 @@ pub async fn watch(conn: Connection, iface: InterfaceRef<MediaService>) -> anyho
             }
             Some(wish) = wished.recv() => watcher.wish(wish),
             Some(event) = received.recv() => match event {
-                Event::Player(name) => watcher.refresh(&name).await,
+                Event::Player { name, seeked } => watcher.refresh(&name, seeked).await,
+                Event::LengthRetry(name) => {
+                    if let Some(entry) = watcher.players.get_mut(&name) {
+                        entry.length_waiting = false;
+                    }
+                    watcher.refresh(&name, None).await;
+                }
                 Event::ArtDone { url, ok } => watcher.art_done(url, ok),
                 Event::Lyrics { lookup, lyrics } => {
                     watcher.lyrics_done(lookup, lyrics).await;
@@ -279,7 +296,7 @@ impl Watcher {
             Ok(entry) => {
                 debug!("found media player {name}");
                 self.players.insert(name.clone(), entry);
-                self.refresh(&name).await;
+                self.refresh(&name, None).await;
             }
             Err(err) => warn!("could not watch media player {name}: {err}"),
         }
@@ -319,10 +336,16 @@ impl Watcher {
         let mut seeked = player.receive_seeked().await?;
         let events = self.events.clone();
         let listener = tokio::spawn(async move {
+            // Firefox reports Position as 0 after a seek, but the Seeked signal carries the real one.
+            let mut seek_to: Option<i64> = None;
             loop {
                 tokio::select! {
                     Some(_) = changed.next() => {}
-                    Some(_) = seeked.next() => {}
+                    Some(signal) = seeked.next() => {
+                        if let Ok(args) = signal.args() {
+                            seek_to = Some(args.position);
+                        }
+                    }
                     else => break,
                 }
                 // The rest of a burst comes with it, and the player is read once.
@@ -332,10 +355,21 @@ impl Watcher {
                     tokio::select! {
                         () = &mut quiet => break,
                         Some(_) = changed.next() => {}
-                        Some(_) = seeked.next() => {}
+                        Some(signal) = seeked.next() => {
+                            if let Ok(args) = signal.args() {
+                                seek_to = Some(args.position);
+                            }
+                        }
                     }
                 }
-                if events.send(Event::Player(name.clone())).is_err() {
+                let seeked_us = seek_to.take();
+                if events
+                    .send(Event::Player {
+                        name: name.clone(),
+                        seeked: seeked_us,
+                    })
+                    .is_err()
+                {
                     break;
                 }
             }
@@ -350,11 +384,14 @@ impl Watcher {
             snapshot: Snapshot::default(),
             started_playing: 0,
             listener,
+            length_tries: 0,
+            length_waiting: false,
         })
     }
 
     /// Reads a player again; one that just started playing takes over from a hand-picked one.
-    async fn refresh(&mut self, name: &OwnedBusName) {
+    /// `seeked` is the position from a `Seeked` in this burst, which wins over the property read.
+    async fn refresh(&mut self, name: &OwnedBusName, seeked: Option<i64>) {
         let Some(entry) = self.players.get_mut(name) else {
             return;
         };
@@ -364,14 +401,17 @@ impl Watcher {
                 .get_all(InterfaceName::from_static_str_unchecked(PLAYER_INTERFACE)),
         )
         .await;
-        let snapshot = match all {
+        let read = match all {
             Ok(all) => snapshot(&all),
             Err(err) => {
                 debug!("could not read {name}: {err}");
                 return;
             }
         };
-        if snapshot.status == "Playing" && entry.snapshot.status != "Playing" {
+        let previous = entry.snapshot.clone();
+        let same = same_track(&previous, &read);
+        let snapshot = reconcile(&previous, read, seeked);
+        if snapshot.status == "Playing" && previous.status != "Playing" {
             self.play_counter += 1;
             entry.started_playing = self.play_counter;
             // Another player started: the one picked by hand gives way.
@@ -379,7 +419,38 @@ impl Watcher {
                 self.chosen = None;
             }
         }
+        if !same {
+            entry.length_tries = 0;
+            entry.length_waiting = false;
+        }
+        let needs_length = snapshot.status == "Playing" && snapshot.length_us <= 0;
+        if !needs_length {
+            entry.length_tries = 0;
+        }
         entry.snapshot = snapshot;
+        if needs_length {
+            self.schedule_length_retry(name);
+        }
+    }
+
+    /// Reads the player again soon when it is playing and still has no length.
+    /// Firefox often sends the duration a moment after playback starts, without another signal worth trusting.
+    fn schedule_length_retry(&mut self, name: &OwnedBusName) {
+        let Some(entry) = self.players.get_mut(name) else {
+            return;
+        };
+        if entry.length_waiting || entry.length_tries >= 2 {
+            return;
+        }
+        entry.length_waiting = true;
+        entry.length_tries += 1;
+        let delay = Duration::from_secs(if entry.length_tries == 1 { 1 } else { 3 });
+        let events = self.events.clone();
+        let name = name.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(delay).await;
+            let _ = events.send(Event::LengthRetry(name));
+        });
     }
 
     /// The player picked by hand, else the one that is playing, else the one that played most recently.
@@ -685,6 +756,7 @@ fn snapshot(all: &HashMap<String, OwnedValue>) -> Snapshot {
         }),
         length_us: meta("mpris:length").and_then(integer).unwrap_or(0),
         position_us: get("Position").and_then(integer).unwrap_or(0),
+        position_known: get("Position").and_then(integer).is_some(),
         sampled_at_ms: now_ms(),
         rate: get("Rate").and_then(float).unwrap_or(1.0),
         can_go_next: flag("CanGoNext"),
@@ -727,8 +799,64 @@ fn integer(value: &Value<'_>) -> Option<i64> {
         Value::I32(n) => Some(i64::from(*n)),
         Value::U32(n) => Some(i64::from(*n)),
         Value::F64(n) => Some(*n as i64),
+        // Firefox has sent the length as a string of digits.
+        Value::Str(text) => text
+            .parse::<i64>()
+            .ok()
+            .or_else(|| text.parse::<f64>().ok().map(|n| n as i64)),
         _ => None,
     }
+}
+
+/// A reported position this far behind the one already tracked is a stale read, not a seek.
+const STALE_BEHIND_US: f64 = 1_500_000.0;
+
+/// The same media: the track id when both have one, otherwise the title and artist.
+fn same_track(previous: &Snapshot, next: &Snapshot) -> bool {
+    match (&previous.track_id, &next.track_id) {
+        (Some(before), Some(after)) => before == after,
+        _ => {
+            !previous.title.is_empty()
+                && previous.title == next.title
+                && previous.artist == next.artist
+        }
+    }
+}
+
+/// Folds a fresh read into the sample already trusted.
+///
+/// Zen and Firefox report `Position` as 0 while a video plays, and drop `mpris:length` after a seek.
+/// `Seeked` carries the real position. A restart changes the track, pauses, or sends `Seeked`.
+fn reconcile(previous: &Snapshot, mut next: Snapshot, seeked_us: Option<i64>) -> Snapshot {
+    let same = same_track(previous, &next);
+    if next.length_us <= 0 && previous.length_us > 0 && same {
+        next.length_us = previous.length_us;
+    }
+    if next.status == "Playing" && next.rate <= 0.0 {
+        next.rate = if previous.rate > 0.0 {
+            previous.rate
+        } else {
+            1.0
+        };
+    }
+    if let Some(position) = seeked_us {
+        next.position_us = position.max(0);
+        next.sampled_at_ms = now_ms();
+        next.position_known = true;
+        return next;
+    }
+    if same && previous.status == "Playing" && next.status == "Playing" {
+        let elapsed_ms = (next.sampled_at_ms - previous.sampled_at_ms).max(0) as f64;
+        let predicted = previous.position_us as f64 + elapsed_ms * previous.rate.max(0.0) * 1000.0;
+        let behind = predicted - next.position_us as f64;
+        // Unknown, or a 0 (or any jump backwards) while playback never stopped.
+        if !next.position_known || behind > STALE_BEHIND_US {
+            next.position_us = previous.position_us;
+            next.sampled_at_ms = previous.sampled_at_ms;
+            next.position_known = previous.position_known;
+        }
+    }
+    next
 }
 
 /// A float, or an integer some players send for the rate.
@@ -762,6 +890,58 @@ mod tests {
             .iter()
             .map(|(name, playing, started)| (name, *playing, *started));
         pick(players, chosen.as_ref()).copied()
+    }
+
+    fn shot(title: &str, position_us: i64, sampled_at_ms: i64, length_us: i64) -> super::Snapshot {
+        super::Snapshot {
+            status: "Playing".into(),
+            title: title.into(),
+            position_us,
+            sampled_at_ms,
+            length_us,
+            rate: 1.0,
+            position_known: true,
+            ..super::Snapshot::default()
+        }
+    }
+
+    #[test]
+    fn a_real_position_replaces_the_sample() {
+        let previous = shot("Song", 30_000_000, 1_000, 180_000_000);
+        let next = shot("Song", 32_000_000, 3_000, 180_000_000);
+        let got = super::reconcile(&previous, next, None);
+        assert_eq!(got.position_us, 32_000_000);
+        assert_eq!(got.sampled_at_ms, 3_000);
+    }
+
+    #[test]
+    fn a_zero_while_playing_does_not_rewind() {
+        let previous = shot("Song", 30_000_000, 1_000, 180_000_000);
+        let mut next = shot("Song", 0, 5_000, 0);
+        next.position_known = true;
+        let got = super::reconcile(&previous, next, None);
+        assert_eq!(got.position_us, 30_000_000);
+        assert_eq!(got.sampled_at_ms, 1_000);
+        assert_eq!(got.length_us, 180_000_000);
+    }
+
+    #[test]
+    fn seeked_wins_over_a_following_zero() {
+        let previous = shot("Song", 30_000_000, 1_000, 180_000_000);
+        let next = shot("Song", 0, 5_000, 0);
+        let got = super::reconcile(&previous, next, Some(90_000_000));
+        assert_eq!(got.position_us, 90_000_000);
+        assert!(got.sampled_at_ms >= 5_000);
+        assert_eq!(got.length_us, 180_000_000);
+    }
+
+    #[test]
+    fn a_new_title_drops_the_old_length() {
+        let previous = shot("Song", 30_000_000, 1_000, 180_000_000);
+        let next = shot("Other", 0, 5_000, 0);
+        let got = super::reconcile(&previous, next, None);
+        assert_eq!(got.length_us, 0);
+        assert_eq!(got.position_us, 0);
     }
 
     #[test]

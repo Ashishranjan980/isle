@@ -50,6 +50,19 @@ pub struct NowPlaying {
 /// Within this, a position sampled again is the same moment of the song.
 const SAME_POSITION_MS: f64 = 250.0;
 
+/// Where playback is now, from the last sample. A player that reports 0 is not asked.
+fn believed_position_us(now: &NowPlaying) -> i64 {
+    let mut position = now.position_us.max(0) as f64;
+    if now.status == "Playing" {
+        let elapsed_ms = (crate::clock::now_ms() - now.sampled_at_ms).max(0) as f64;
+        position += elapsed_ms * now.rate.max(0.0) * 1000.0;
+    }
+    if now.length_us > 0 {
+        position = position.min(now.length_us as f64);
+    }
+    position.max(0.0) as i64
+}
+
 impl NowPlaying {
     /// Whether `next` says nothing new: the same song and state, at the position this one predicts.
     /// Players resend their properties often (volume, shuffle, metadata), each with a fresh position.
@@ -153,13 +166,16 @@ impl MediaService {
     /// Seeks to an absolute position in microseconds.
     fn set_position(&self, position_us: i64) -> fdo::Result<()> {
         let position_us = position_us.max(0);
+        // Firefox's Position read is 0 while playing, so a relative seek from that jumps to the start.
+        let believed = believed_position_us(&self.now_playing);
         self.send("SetPosition", move |player, track| async move {
             match track {
                 Some(track) => player.set_position(&track, position_us).await,
                 // Without a track id only a relative seek works; measure it from the player's
                 // live position, since our own sample may be seconds old.
                 None => {
-                    let current = player.position().await?;
+                    let live = player.position().await.unwrap_or(0);
+                    let current = if live > 0 { live } else { believed };
                     player.seek(position_us.saturating_sub(current)).await
                 }
             }
