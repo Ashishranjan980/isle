@@ -1,76 +1,128 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 zickrian
 
-// The app usage session's rules, with no GNOME:
+// The app usage session and report buffer, with no GNOME:
 // `node --experimental-default-type=module --test tests/extension/*.test.js`.
 
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
+import {AppUsageReports} from '../../gnome-extension/src/appUsageReports.js';
 import {AppUsageSession} from '../../gnome-extension/src/appUsageSession.js';
 
 const BRAVE = {id: 'brave-browser.desktop', name: 'Brave Web Browser'};
 const CODE = {id: 'code.desktop', name: 'Visual Studio Code'};
 const SPOTIFY = {id: 'spotify.desktop', name: 'Spotify'};
+const WALL = 1_700_000_000_000;
 
-test('a focused app keeps counting without input', () => {
-    let now = 10_000;
-    const session = new AppUsageSession(() => now);
+/** A monotonic and wall clock that advance together. */
+function clock() {
+    let now = 0;
+    let wall = WALL;
+    return {
+        now: () => now,
+        wall: () => wall,
+        advance(ms) {
+            now += ms;
+            wall += ms;
+        },
+    };
+}
+
+test('time in front counts without input, and a new stretch starts after a gap', () => {
+    const time = clock();
+    const session = new AppUsageSession(time.now, time.wall);
     session.switchTo(BRAVE);
-    // Twenty minutes with no keyboard or pointer event, and no focus change.
-    now += 20 * 60_000;
-    assert.deepEqual(session.flush(), {...BRAVE, ms: 20 * 60_000});
-    // A report flushes the stretch but does not reset the app or count it twice.
-    now += 60_000;
-    assert.deepEqual(session.flush(), {...BRAVE, ms: 60_000});
+    // Five minutes with no input: the app in front still counts all of it.
+    time.advance(5 * 60_000);
+    assert.deepEqual(session.end(), {...BRAVE, start: WALL, ms: 5 * 60_000});
+    // Away for ten more minutes: no app's time passes.
+    time.advance(10 * 60_000);
+    assert.equal(session.flush(), null);
+    // The next input starts a new stretch.
+    session.switchTo(BRAVE);
+    time.advance(60_000);
+    assert.deepEqual(session.flush(), {...BRAVE, start: WALL + 15 * 60_000, ms: 60_000});
+});
+
+test('a session held awake keeps counting past five idle minutes', () => {
+    const time = clock();
+    const session = new AppUsageSession(time.now, time.wall);
+    session.switchTo(BRAVE);
+    // A video is playing, so appUsage.js does not end the session at the idle watch.
+    time.advance(20 * 60_000);
+    assert.deepEqual(session.flush(), {...BRAVE, start: WALL, ms: 20 * 60_000});
 });
 
 test('focus moving to another app ends the old stretch and starts the new one', () => {
-    let now = 0;
-    const session = new AppUsageSession(() => now);
+    const time = clock();
+    const session = new AppUsageSession(time.now, time.wall);
     session.switchTo(BRAVE);
-    now += 5 * 60_000;
-    assert.deepEqual(session.switchTo(CODE, now), {...BRAVE, ms: 5 * 60_000});
-    now += 2 * 60_000;
-    assert.deepEqual(session.flush(), {...CODE, ms: 2 * 60_000});
+    time.advance(5 * 60_000);
+    assert.deepEqual(session.switchTo(CODE, time.now(), time.wall()), {...BRAVE, start: WALL, ms: 5 * 60_000});
+    time.advance(2 * 60_000);
+    assert.deepEqual(session.flush(), {...CODE, start: WALL + 5 * 60_000, ms: 2 * 60_000});
 });
 
 test('another window of the same app keeps the session whole', () => {
-    let now = 0;
-    const session = new AppUsageSession(() => now);
+    const time = clock();
+    const session = new AppUsageSession(time.now, time.wall);
     session.switchTo(BRAVE);
-    now += 3 * 60_000;
+    time.advance(3 * 60_000);
     // The focus moved to another Brave window: the same desktop id is not a new session.
-    assert.equal(session.switchTo({...BRAVE}, now), null);
-    now += 4 * 60_000;
-    assert.deepEqual(session.flush(), {...BRAVE, ms: 7 * 60_000});
+    assert.equal(session.switchTo({...BRAVE}, time.now(), time.wall()), null);
+    time.advance(4 * 60_000);
+    assert.deepEqual(session.flush(), {...BRAVE, start: WALL, ms: 7 * 60_000});
 });
 
 test('no focused window stops the clock until an app is in front again', () => {
-    let now = 0;
-    const session = new AppUsageSession(() => now);
+    const time = clock();
+    const session = new AppUsageSession(time.now, time.wall);
     session.switchTo(BRAVE);
-    now += 2 * 60_000;
-    assert.deepEqual(session.switchTo(null, now), {...BRAVE, ms: 2 * 60_000});
+    time.advance(2 * 60_000);
+    assert.deepEqual(session.switchTo(null, time.now(), time.wall()), {...BRAVE, start: WALL, ms: 2 * 60_000});
     // The desktop or the overview: no app is in front, so no app's time passes.
-    now += 30 * 60_000;
+    time.advance(30 * 60_000);
     assert.equal(session.flush(), null);
-    session.switchTo(SPOTIFY, now);
-    now += 60_000;
-    assert.deepEqual(session.flush(), {...SPOTIFY, ms: 60_000});
+    session.switchTo(SPOTIFY);
+    time.advance(60_000);
+    assert.deepEqual(session.flush(), {...SPOTIFY, start: WALL + 32 * 60_000, ms: 60_000});
 });
 
 test('ending the session reports its last stretch once', () => {
-    let now = 0;
-    const session = new AppUsageSession(() => now);
+    const time = clock();
+    const session = new AppUsageSession(time.now, time.wall);
     session.switchTo(BRAVE);
-    now += 90_000;
-    assert.deepEqual(session.end(), {...BRAVE, ms: 90_000});
+    time.advance(90_000);
+    assert.deepEqual(session.end(), {...BRAVE, start: WALL, ms: 90_000});
     assert.equal(session.end(), null);
-    now += 60_000;
+    time.advance(60_000);
     assert.equal(session.flush(), null);
     // A new focus after the session ended starts from zero.
-    session.switchTo(BRAVE, now);
-    now += 2_000;
-    assert.deepEqual(session.flush(), {...BRAVE, ms: 2_000});
+    session.switchTo(BRAVE);
+    time.advance(2_000);
+    assert.deepEqual(session.flush(), {...BRAVE, start: WALL + 150_000, ms: 2_000});
+});
+
+test('reports merge a stretch that goes on with the same app, and drop flicks', () => {
+    const reports = new AppUsageReports();
+    reports.add({...BRAVE, start: WALL, ms: 30_000});
+    reports.add({...BRAVE, start: WALL + 30_000, ms: 30_000});
+    reports.add({...BRAVE, start: WALL + 60_000, ms: 500});
+    assert.deepEqual(reports.take(), [{...BRAVE, start: WALL, ms: 60_000}]);
+    assert.equal(reports.size, 0);
+});
+
+test('reports keep different apps, names and untouching stretches apart', () => {
+    const reports = new AppUsageReports();
+    reports.add({...BRAVE, start: WALL, ms: 1_000});
+    reports.add({...CODE, start: WALL + 1_000, ms: 2_000});
+    reports.add({...BRAVE, start: WALL + 3_000, ms: 3_000});
+    reports.add({...BRAVE, name: 'Brave', start: WALL + 6_000, ms: 4_000});
+    assert.deepEqual(reports.take(), [
+        {...BRAVE, start: WALL, ms: 1_000},
+        {...CODE, start: WALL + 1_000, ms: 2_000},
+        {...BRAVE, start: WALL + 3_000, ms: 3_000},
+        {...BRAVE, name: 'Brave', start: WALL + 6_000, ms: 4_000},
+    ]);
 });

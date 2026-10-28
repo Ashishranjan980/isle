@@ -95,9 +95,14 @@ export const ExpandedView = GObject.registerClass({
         this.connect('captured-event', (_actor, event) => this._captureScroll(event));
 
         this._header = this._buildHeader();
-        // The open tab's name is only measured right once on the stage.
+        // The open tab's name is only measured right once on the stage. Measured as soon as it is on one,
+        // even while the island is closed, so opening it already knows the width its tabs need.
         this.connect('notify::mapped', () => {
             if (this.mapped)
+                this._syncTabs();
+        });
+        this.connect('notify::stage', () => {
+            if (this.get_stage())
                 this._syncTabs();
         });
         this.add_child(this._header);

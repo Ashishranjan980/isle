@@ -56,11 +56,11 @@ class AppsPage extends Page {
         this._tracker = tracker;
         this._period = 'today';
         this._key = null;
+        this._stats = null;
 
         this.add_child(this._buildBar());
         this.add_child(this._buildList());
 
-        this.watch(['appUsage'], () => this._update());
         this._update();
     }
 
@@ -117,7 +117,7 @@ class AppsPage extends Page {
 
     /** The apps of the period shown, as isled last summed them. */
     _apps() {
-        return this.daemon.state.appUsage?.[this._period] ?? [];
+        return this._stats?.[this._period] ?? [];
     }
 
     /** Switches the period; the rows and heading follow. */
@@ -177,24 +177,38 @@ class AppsPage extends Page {
         return row;
     }
 
-    /** Builds the rows ahead, if this is the first warm-up or something changed out of sight. */
-    warmUp() {
-        this._update();
-    }
-
-    /** The page is on screen: send what is timed so far, then once a minute while it stays open. */
+    /** The page is on screen: send what is timed so far, ask for the totals, then once a minute. */
     onActivate() {
         this._refresh();
         this.later('refresh', 60000, () => this.onActivate());
     }
 
-    /** Nothing more to send while it is closed. */
+    /** Nothing is asked or rebuilt while it is closed. */
     onDeactivate() {
         this.cancel('refresh');
     }
 
-    _refresh() {
-        this._tracker?.flush();
+    /** The history changed elsewhere (Settings cleared it): ask again while shown. */
+    refresh() {
+        if (this.active)
+            this._refresh();
+    }
+
+    async _refresh() {
+        await this._tracker?.flush();
+        if (!this.active || this._destroyed)
+            return;
+        const result = await this.daemon.call('appUsage', 'GetStats');
+        if (!this.active || this._destroyed)
+            return;
+        const stats = result?.[0];
+        if (stats) {
+            try {
+                this._stats = JSON.parse(stats);
+            } catch (e) {
+                console.warn(`Isle: invalid app usage: ${e.message}`);
+            }
+        }
         this._update();
     }
 });

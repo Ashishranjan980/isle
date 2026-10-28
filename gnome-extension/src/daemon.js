@@ -102,13 +102,11 @@ const INTERFACES = {
     appUsage: {
         xml: node('AppUsage1', `
             <method name="Report">
-                <arg name="app_id" type="s" direction="in"/>
-                <arg name="name" type="s" direction="in"/>
-                <arg name="ms" type="x" direction="in"/>
+                <arg name="stretches" type="a(ssxx)" direction="in"/>
             </method>
-            <method name="Clear"/>
-            <property name="Stats" type="s" access="read"/>`),
-        properties: {Stats: 'appUsage'},
+            <method name="GetStats"><arg name="stats" type="s" direction="out"/></method>
+            <method name="Clear"/>`),
+        properties: {},
     },
     usage: {
         xml: node('Usage1', `

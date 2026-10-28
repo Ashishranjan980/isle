@@ -34,7 +34,7 @@ sizes are logical pixels.
 | Compact | 144 × P; 232 with an activity | 10 | 7 | Clock; activity slots left/right |
 | Compact, hanging | 164 × (P + 30); 256 with an activity | 16 | 10 | As above |
 | Peek (alert) | fits its content, 220–380 wide × (P + 56); 62 high off a black bar | 22 | 13 | Badge · title/subtitle · value, level bar or button, centred |
-| Expanded | 600 × (P + 164) on every page; 720 for lyrics | 32 | 22 | Header row (tabs) · page |
+| Expanded | 600 × (P + 164) on every page; wider when its tabs need room; 720 for lyrics | 32 | 22 | Header row (tabs) · page |
 
 The top bar is slimmed to a thin bezel (status icons and the tray stay in
 it) and see-through like glass, with no colour of its own. The
@@ -162,8 +162,9 @@ name, and a red dot on Notifications while some are unseen. On the right a
 red "● 0:42" pill while the screen records (click to stop), a green "📞 1:15"
 pill during a call on any page but Call (click: the Call page), the privacy
 dots, the music bars, the assistant's sparkle, `[timer ring] Tue 20 Oct 12:26` and the gear. The
-tabs' icons, the gear and the pages' contents share the same 28 px edges. The Call tab, its
-phone in green, only shows during a call.
+tabs' icons, the gear and the pages' contents share the same 28 px edges. When the tabs and the
+status together need more than the page's width, the island grows to fit them, by the same amount on
+both sides so the clock stays centred. The Call tab, its phone in green, only shows during a call.
 
 **Call**, laid out like FaceTime's controls. A call is an app holding the
 microphone for over 2 s (sites open it briefly to ask for permission), in
@@ -338,13 +339,17 @@ per app,
 most used first: its icon, name, a thin white bar against the most used
 app, and its time ("1h 12m", or "<1m" under a minute). Rows scroll with the
 wheel or touchpad. Empty:
-"No usage yet · Time in the app in front shows up here". Only the
-application in front is timed, whether or not there is keyboard or pointer
-input; it stops when focus moves to another application, when no window is
-in front, or when the screen locks. A stretch is sent to `isled` as focus
-moves, as the screen locks, and as the page opens; nothing polls while it
-is closed. `isled` keeps 30 days in `~/.local/share/isle/app-usage.json`;
-turning the Apps page off in Settings stops the timing and sends what it
+"No usage yet · Time in the app in front shows up here". Off until its
+switch in Settings is turned on. Only the application in front is timed,
+whether or not there is keyboard or pointer input; it stops when focus
+moves to another application, when no window is in front, when the screen
+locks, and after five minutes without input, unless a video or another
+program holds the session awake; the next input goes on timing. The
+extension keeps the stretches and sends them to `isled` at most once a
+minute, as the page opens, and when timing stops; nothing polls while the
+page is closed. A stretch past local midnight counts for each day it
+spans. `isled` keeps 30 days in `~/.local/share/isle/app-usage.json`;
+turning the Apps page or its switch off stops the timing and sends what it
 had.
 
 ## 6. Alerts
@@ -514,10 +519,11 @@ hovering opens the Notifications page.
 - The bot in the closed island is drawn once and moves only while the assistant works.
 - Animations run on the display's frame clock only while a spring moves.
 - The open island ticks only the visible page (scrubber 4×/s, timer 1×/s).
-- App usage is event driven: the shell says when focus changes, and the
-  extension sends the stretch then; the Apps page asks once a minute only
-  while it is on screen. Nothing is polled or timed while the page is
-  closed.
+- App usage is event driven: the shell says when focus changes, when input
+  stops for five minutes and when it returns. Those stretches wait in the
+  extension and go to `isled` at most once a minute; the Apps page asks for
+  the totals once a minute only while it is on screen. Nothing is polled or
+  timed while the page is closed.
 - Calls are found from the shell's own audio events, never polled. The
   call's length ticks once a second only while it is on screen; the call
   preview reuses the window's picture and exists only while the Call page

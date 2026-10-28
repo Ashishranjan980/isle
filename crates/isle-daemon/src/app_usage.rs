@@ -1,20 +1,33 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 zickrian
 
-//! App usage: the extension times the app in front and reports each stretch here. Kept day by day for
-//! a month, in `~/.local/share/isle/app-usage.json`, and shown on the Apps page.
+//! App usage: the extension times the app in front and reports its stretches here. Kept day by day
+//! for a month, in `~/.local/share/isle/app-usage.json`, and shown on the Apps page.
 
-use isle_core::app_usage::{AppTotal, AppUsage, KEEP_DAYS};
-use log::warn;
-use serde::Serialize;
+use chrono::{Local, TimeZone};
+use isle_core::app_usage::{AppTotal, AppUsage, KEEP_DAYS, MAX_REPORT_MS};
+use serde::{Deserialize, Serialize};
 use tokio::sync::Notify;
-use zbus::object_server::{InterfaceRef, SignalEmitter};
+use zbus::object_server::InterfaceRef;
+use zbus::zvariant::Type;
 use zbus::{fdo, interface};
 
-use crate::clock::{days_back, next_midnight, today, wait_until};
+use crate::clock::{days_back, local_midnight, next_midnight, wait_until};
 use crate::store::Store;
 
-/// What the `Stats` property holds: today, the last seven days including today, and the last 30.
+/// One timed stretch: an app, when it began (milliseconds since the epoch), and how long it lasted.
+#[derive(Debug, Deserialize, Type)]
+struct Stretch {
+    id: String,
+    name: String,
+    start_ms: i64,
+    ms: i64,
+}
+
+/// The most stretches one report may carry; the extension sends a minute's worth.
+const MAX_STRETCHES: usize = 1_000;
+
+/// What `GetStats` returns: today, the last seven days including today, and the last 30.
 #[derive(Serialize)]
 struct Stats {
     today: Vec<AppTotal>,
@@ -40,12 +53,6 @@ impl AppUsageService {
         Self { usage, store }
     }
 
-    /// Saves and publishes the new times.
-    async fn changed(&self, emitter: &SignalEmitter<'_>) -> zbus::Result<()> {
-        self.store.save(&self.usage);
-        self.stats_changed(emitter).await
-    }
-
     /// Today's apps, the last seven days', and the last 30 (all that is kept).
     fn snapshot(&self) -> Stats {
         let days = days_back(KEEP_DAYS);
@@ -61,39 +68,97 @@ impl AppUsageService {
 
 #[interface(name = "io.github.zickrian.isle.AppUsage1")]
 impl AppUsageService {
-    /// Adds a stretch of `ms` in `app_id`, named `name`; the extension sends one as focus moves.
+    /// Adds stretches the extension timed; a stretch past midnight is split between the two days.
+    /// GNOME Shell's to report, no other program's.
     async fn report(
         &mut self,
-        app_id: &str,
-        name: &str,
-        ms: i64,
-        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        stretches: Vec<Stretch>,
+        #[zbus(connection)] connection: &zbus::Connection,
+        #[zbus(header)] header: zbus::message::Header<'_>,
     ) -> fdo::Result<()> {
-        if !self.usage.record(&today(), app_id, name, ms) {
-            return Err(fdo::Error::InvalidArgs(
-                "an app id and 1 ms to 24 hours are needed".into(),
-            ));
+        crate::caller::shell_only(connection, &header).await?;
+        if stretches.len() > MAX_STRETCHES {
+            return Err(fdo::Error::InvalidArgs(format!(
+                "at most {MAX_STRETCHES} stretches fit in one report"
+            )));
         }
-        Ok(self.changed(&emitter).await?)
+        // Everything or nothing: a bad stretch in the batch does not leave half of it recorded.
+        let mut next = self.usage.clone();
+        for stretch in stretches {
+            if !record_span(&mut next, &stretch) {
+                return Err(fdo::Error::InvalidArgs(
+                    "an app id, a start after 1970 and 1 ms to 24 hours are needed".into(),
+                ));
+            }
+        }
+        self.usage = next;
+        self.store.save(&self.usage);
+        Ok(())
     }
 
-    /// Forgets every day, as Settings offers.
+    /// The history as JSON `{today: [{id, name, ms}], week: [...], month: [...]}`, most used first.
+    /// GNOME Shell's to ask, no other program's: it names every app the user ran.
+    async fn get_stats(
+        &self,
+        #[zbus(connection)] connection: &zbus::Connection,
+        #[zbus(header)] header: zbus::message::Header<'_>,
+    ) -> fdo::Result<String> {
+        crate::caller::shell_only(connection, &header).await?;
+        serde_json::to_string(&self.snapshot())
+            .map_err(|err| fdo::Error::Failed(format!("could not write app usage: {err}")))
+    }
+
+    /// Forgets every day, as Settings offers. GNOME Shell's to ask, no other program's.
     async fn clear(
         &mut self,
-        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        #[zbus(connection)] connection: &zbus::Connection,
+        #[zbus(header)] header: zbus::message::Header<'_>,
     ) -> fdo::Result<()> {
+        crate::caller::shell_only(connection, &header).await?;
         self.usage.clear();
-        Ok(self.changed(&emitter).await?)
-    }
-
-    /// JSON `{today: [{id, name, ms}], week: [{id, name, ms}]}`, most used first.
-    #[zbus(property)]
-    fn stats(&self) -> String {
-        serde_json::to_string(&self.snapshot()).unwrap_or_default()
+        self.store.save(&self.usage);
+        Ok(())
     }
 }
 
-/// Drops days past the month kept as midnight passes, and tells clients that today is new.
+/// Adds one stretch, splitting it at local midnights; false when its times are impossible.
+fn record_span(usage: &mut AppUsage, stretch: &Stretch) -> bool {
+    let &Stretch {
+        ref id,
+        ref name,
+        start_ms,
+        ms,
+    } = stretch;
+    if start_ms <= 0 || !(1..=MAX_REPORT_MS).contains(&ms) {
+        return false;
+    }
+    let Some(start) = Local.timestamp_millis_opt(start_ms).single() else {
+        return false;
+    };
+    let end_ms = start_ms.saturating_add(ms);
+    let mut day = start.date_naive();
+    let mut cursor = start_ms;
+    loop {
+        let Some(next_day) = day.succ_opt() else {
+            return false;
+        };
+        let Some(midnight) = local_midnight(next_day) else {
+            return false;
+        };
+        let until = end_ms.min(midnight);
+        let part = until - cursor;
+        if part > 0 && !usage.record(&day.to_string(), id, name, part) {
+            return false;
+        }
+        if until >= end_ms {
+            return true;
+        }
+        cursor = midnight;
+        day = next_day;
+    }
+}
+
+/// Drops days past the month kept as midnight passes.
 pub async fn run(iface: InterfaceRef<AppUsageService>) {
     let wake = Notify::new();
     loop {
@@ -108,8 +173,59 @@ pub async fn run(iface: InterfaceRef<AppUsageService>) {
         {
             service.store.save(&service.usage);
         }
-        if let Err(err) = service.stats_changed(iface.signal_emitter()).await {
-            warn!("could not publish app usage after midnight: {err}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn stretch(start_ms: i64, ms: i64) -> Stretch {
+        Stretch {
+            id: "app.desktop".into(),
+            name: "App".into(),
+            start_ms,
+            ms,
         }
+    }
+
+    #[test]
+    fn a_stretch_across_midnight_is_split_between_the_days() {
+        let start = Local
+            .with_ymd_and_hms(2026, 10, 20, 23, 50, 0)
+            .single()
+            .unwrap()
+            .timestamp_millis();
+        let mut usage = AppUsage::default();
+        assert!(record_span(&mut usage, &stretch(start, 20 * 60 * 1000)));
+        assert_eq!(usage.totals(["2026-10-20"])[0].ms, 10 * 60 * 1000);
+        assert_eq!(usage.totals(["2026-10-21"])[0].ms, 10 * 60 * 1000);
+    }
+
+    #[test]
+    fn a_stretch_inside_one_day_stays_on_it() {
+        let start = Local
+            .with_ymd_and_hms(2026, 10, 20, 12, 0, 0)
+            .single()
+            .unwrap()
+            .timestamp_millis();
+        let mut usage = AppUsage::default();
+        assert!(record_span(&mut usage, &stretch(start, 90 * 60 * 1000)));
+        assert_eq!(usage.totals(["2026-10-20"])[0].ms, 90 * 60 * 1000);
+        assert!(usage.totals(["2026-10-21"]).is_empty());
+    }
+
+    #[test]
+    fn impossible_stretches_are_refused() {
+        let start = Local
+            .with_ymd_and_hms(2026, 10, 20, 12, 0, 0)
+            .single()
+            .unwrap()
+            .timestamp_millis();
+        let mut usage = AppUsage::default();
+        assert!(!record_span(&mut usage, &stretch(0, 1_000)));
+        assert!(!record_span(&mut usage, &stretch(start, 0)));
+        assert!(!record_span(&mut usage, &stretch(start, MAX_REPORT_MS + 1)));
+        assert!(usage.is_empty());
     }
 }

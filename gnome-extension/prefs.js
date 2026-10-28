@@ -23,7 +23,6 @@ const DAEMON = 'io.github.zickrian.isle.Daemon';
 const DAEMON_PATH = '/io/github/zickrian/isle/Daemon';
 const POMODORO_INTERFACE = 'io.github.zickrian.isle.Pomodoro1';
 const CLIPBOARD_INTERFACE = 'io.github.zickrian.isle.Clipboard1';
-const APP_USAGE_INTERFACE = 'io.github.zickrian.isle.AppUsage1';
 const AGENTS_INTERFACE = 'io.github.zickrian.isle.Agents1';
 const ASSISTANT_INTERFACE = 'io.github.zickrian.isle.Assistant1';
 /** Edits to the timer are sent once typing pauses for this long. */
@@ -335,7 +334,7 @@ export default class IslePreferences extends ExtensionPreferences {
         look.add(delay);
         page.add(look);
         page.add(pagesGroup(settings, window));
-        page.add(appUsageGroup(window));
+        page.add(appUsageGroup(settings, window));
         page.add(worldClocksGroup(settings, window));
 
         const alerts = new Adw.PreferencesGroup({title: 'Alerts'});
@@ -800,20 +799,21 @@ function pagesGroup(settings, window) {
     return group;
 }
 
-/** Forgets the app usage kept so far; the page keeps timing afterwards. */
-function appUsageGroup(window) {
+/** Times the app in front, if asked to; forgets what is kept when Settings asks. */
+function appUsageGroup(settings, window) {
     const group = new Adw.PreferencesGroup({
         title: 'App Usage',
-        description: 'Timed while the Apps page is on, and kept on this computer for 30 days.',
+        description: 'Off until you turn it on. Kept on this computer for 30 days.',
     });
+    group.add(switchRow(settings, 'app-usage', 'Track app usage',
+        'Time the application in front, even without input; five idle minutes pause it unless a video holds the session awake'));
     const clear = new Adw.ActionRow({title: 'Clear app usage', subtitle: 'Forget every day recorded so far'});
     const button = new Gtk.Button({label: 'Clear…', valign: Gtk.Align.CENTER});
     button.connect('clicked', () => confirm(window, {
         heading: 'Clear app usage?',
         body: 'Every app\'s time recorded so far is removed. This cannot be undone.',
         action: 'Clear',
-    }, () => Gio.DBus.session.call(DAEMON, DAEMON_PATH, APP_USAGE_INTERFACE, 'Clear', null, null,
-        Gio.DBusCallFlags.NONE, -1, null, null)));
+    }, () => settings.set_boolean('app-usage-clear', true)));
     clear.add_suffix(button);
     group.add(clear);
     return group;

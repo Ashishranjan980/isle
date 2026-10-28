@@ -459,6 +459,8 @@ export class Controller {
             this._settingsChanged.push(this._settings.connect(`changed::${key}`, () => this._syncEventAlerts()));
         for (const key of ['hidden-pages', 'world-clocks'])
             this._settingsChanged.push(this._settings.connect(`changed::${key}`, () => this._syncPages()));
+        for (const key of ['app-usage', 'app-usage-clear'])
+            this._settingsChanged.push(this._settings.connect(`changed::${key}`, () => this._syncAppUsage()));
         for (const provider of AGENT_PROVIDERS) {
             this._settingsChanged.push(this._settings.connect(`changed::agent-alerts-${provider}`, () =>
                 this._hookAgent(provider)));
@@ -724,8 +726,19 @@ export class Controller {
         }
         this._syncUnseen();
         this._syncLyrics();
-        this._appUsage.enabled = !hidden.includes('apps');
+        this._syncAppUsage();
         this._expanded.pageNamed('calendar').worldClocks = this._settings.get_boolean('world-clocks');
+    }
+
+    /** Times the app in front only while its switch and the Apps page are both on; clears when asked. */
+    _syncAppUsage() {
+        const hidden = this._settings.get_strv('hidden-pages');
+        this._appUsage.enabled = this._settings.get_boolean('app-usage') && !hidden.includes('apps');
+        if (!this._settings.get_boolean('app-usage-clear'))
+            return;
+        // Settings cannot call isled's shell-only Clear; it leaves this request for the island.
+        this._settings.set_boolean('app-usage-clear', false);
+        this._appUsage.clear().then(() => this._expanded?.pageNamed('apps')?.refresh());
     }
 
     /** Lyrics are looked up online only for the Music page, and only while it is in the island. */

@@ -73,7 +73,7 @@ pub fn next_midnight() -> Option<i64> {
 }
 
 /// Local midnight starting `date`, in milliseconds since the Unix epoch.
-fn local_midnight(date: NaiveDate) -> Option<i64> {
+pub(crate) fn local_midnight(date: NaiveDate) -> Option<i64> {
     // `earliest` resolves times made ambiguous by daylight saving changes.
     let midnight = Local
         .from_local_datetime(&date.and_hms_opt(0, 0, 0)?)

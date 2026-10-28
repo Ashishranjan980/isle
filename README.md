@@ -133,7 +133,7 @@ appear in the same place instead of in the middle of the screen.
 <tr>
 <td width="50%" valign="top">
 <img src="docs/images/apps.png" alt="Apps page: Brave Web Browser, Visual Studio Code, Spotify and Files with their times today" width="100%"><br>
-<b>App usage.</b> Where your time goes: the application in front today, over the last seven days, or the last 30, with its icon, a bar and its time. Time counts while the app stays focused, even when you are not typing or clicking; locking the screen stops it.
+<b>App usage.</b> Where your time goes: the application in front today, over the last seven days, or the last 30, with its icon, a bar and its time. Off until you turn it on, it times the app in front even when you are not typing or clicking; five idle minutes pause it unless a video holds the session awake, and locking the screen stops it. Kept on this computer for 30 days.
 </td>
 </tr>
 </table>
