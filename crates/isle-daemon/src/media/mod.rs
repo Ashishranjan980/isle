@@ -107,18 +107,32 @@ pub enum Wish {
 }
 
 /// The Media1 D-Bus object: the watcher fills it, the extension reads and controls through it.
-#[derive(Default)]
 pub struct MediaService {
     now_playing: NowPlaying,
     lyrics: Lyrics,
     players: Vec<PlayerChoice>,
     /// The active player and the id of its current track.
     active: Option<(PlayerProxy<'static>, Option<OwnedObjectPath>)>,
-    /// To the watcher, once it runs.
-    wishes: Option<mpsc::UnboundedSender<Wish>>,
+    /// To the watcher; those sent before it runs wait for it.
+    wishes: mpsc::UnboundedSender<Wish>,
 }
 
+pub type Wishes = mpsc::UnboundedReceiver<Wish>;
+
 impl MediaService {
+    /// The service, and the receiving end its wishes arrive on.
+    pub fn new() -> (Self, Wishes) {
+        let (wishes, receiver) = mpsc::unbounded_channel();
+        let service = Self {
+            now_playing: NowPlaying::default(),
+            lyrics: Lyrics::default(),
+            players: Vec::new(),
+            active: None,
+            wishes,
+        };
+        (service, receiver)
+    }
+
     /// Sends a command to the active player in a task of its own, bounded by a timeout.
     /// zbus holds this interface while a method runs, so awaiting a hung player freezes media.
     fn send<F, Fut>(&self, command: &'static str, call: F) -> fdo::Result<()>
@@ -224,12 +238,11 @@ impl MediaService {
 }
 
 impl MediaService {
-    /// Passes a wish on to the watcher; fails before it runs.
+    /// Passes a wish on to the watcher; fails only once it stopped.
     fn wish(&self, wish: Wish) -> fdo::Result<()> {
         self.wishes
-            .as_ref()
-            .and_then(|wishes| wishes.send(wish).ok())
-            .ok_or_else(|| fdo::Error::Failed("media is not watched yet".into()))
+            .send(wish)
+            .map_err(|_| fdo::Error::Failed("media is not watched".into()))
     }
 }
 

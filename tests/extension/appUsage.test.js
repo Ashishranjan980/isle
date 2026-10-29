@@ -147,3 +147,31 @@ test('reports keep different apps, names and untouching stretches apart', () => 
         {...BRAVE, name: 'Brave', start: WALL + 6_000, ms: 4_000},
     ]);
 });
+
+test('a stretch merges up to an hour, then starts a new one', () => {
+    const reports = new AppUsageReports();
+    for (let i = 0; i < 90; i++)
+        reports.add({...BRAVE, start: WALL + i * 60_000, ms: 60_000});
+    assert.deepEqual(reports.take(), [
+        {...BRAVE, start: WALL, ms: 60 * 60_000},
+        {...BRAVE, start: WALL + 60 * 60_000, ms: 30 * 60_000},
+    ]);
+});
+
+test('the buffer keeps the newest 500 stretches while isled is away', () => {
+    const reports = new AppUsageReports();
+    for (let i = 0; i < 600; i++)
+        reports.add({...(i % 2 ? CODE : BRAVE), start: WALL + i * 2_000, ms: 1_000});
+    const kept = reports.take();
+    assert.equal(kept.length, 500);
+    assert.equal(kept[0].start, WALL + 100 * 2_000);
+});
+
+test('stretches a report could not deliver go back ahead of newer ones', () => {
+    const reports = new AppUsageReports();
+    reports.add({...BRAVE, start: WALL, ms: 2_000});
+    const taken = reports.take();
+    reports.add({...CODE, start: WALL + 5_000, ms: 3_000});
+    reports.restore(taken);
+    assert.deepEqual(reports.take(), [{...BRAVE, start: WALL, ms: 2_000}, {...CODE, start: WALL + 5_000, ms: 3_000}]);
+});

@@ -30,6 +30,13 @@ const Bar = GObject.registerClass(class Bar extends St.Widget {
         this.add_child(this._fill);
     }
 
+    set share(share) {
+        if (share === this._share)
+            return;
+        this._share = share;
+        this.queue_relayout();
+    }
+
     vfunc_allocate(box) {
         this.set_allocation(box);
         const [width, height] = box.get_size();
@@ -56,6 +63,7 @@ class AppsPage extends Page {
         this._tracker = tracker;
         this._period = 'today';
         this._key = null;
+        this._rows = [];
         this._stats = null;
 
         this.add_child(this._buildBar());
@@ -148,17 +156,19 @@ class AppsPage extends Page {
         this._empty.visible = apps.length === 0;
         this._scroll.visible = apps.length > 0;
 
-        const key = JSON.stringify([this._period, apps]);
-        if (key === this._key)
+        // The same apps in the same order (most minutes): their times and bars change in place.
+        const most = Math.max(1, ...apps.map(app => app.ms));
+        const key = JSON.stringify([this._period, apps.map(app => [app.id, app.name])]);
+        if (key === this._key) {
+            apps.forEach((app, i) => this._rows[i].update(app, most));
             return;
+        }
         this._key = key;
         this._list.destroy_all_children();
-        const most = Math.max(1, ...apps.map(app => app.ms));
-        for (const app of apps)
-            this._list.add_child(this._row(app, most));
+        this._rows = apps.map(app => this._row(app, most));
     }
 
-    /** One app: its icon, name, a bar against the most used, and its time. */
+    /** Adds one app's row: its icon, name, a bar against the most used, and its time; returns its updater. */
     _row(app, most) {
         const row = new St.BoxLayout({style_class: 'isle-apps-row'});
         const shellApp = Shell.AppSystem.get_default().lookup_app(app.id);
@@ -172,9 +182,17 @@ class AppsPage extends Page {
         const name = label(shellApp?.get_name() ?? app.name ?? app.id, 'isle-apps-name', {x_expand: true});
         name.clutter_text.ellipsize = Pango.EllipsizeMode.END;
         row.add_child(name);
-        row.add_child(new Bar(Math.max(0, app.ms) / most));
-        row.add_child(label(Format.hoursMinutes(app.ms), 'isle-apps-time'));
-        return row;
+        const bar = new Bar(Math.max(0, app.ms) / most);
+        row.add_child(bar);
+        const time = label(Format.hoursMinutes(app.ms), 'isle-apps-time');
+        row.add_child(time);
+        this._list.add_child(row);
+        return {
+            update: (next, top) => {
+                bar.share = Math.max(0, next.ms) / top;
+                time.text = Format.hoursMinutes(next.ms);
+            },
+        };
     }
 
     /** The page is on screen: send what is timed so far, ask for the totals, then ask once a minute. */

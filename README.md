@@ -123,7 +123,7 @@ appear in the same place instead of in the middle of the screen.
 <tr>
 <td width="50%" valign="top">
 <img src="docs/images/alerts.png" alt="The closed island with a song and the focus timer, then alerts for a meeting with Join, Claude Code asking to run a command, a notification with Reply, and charging" width="100%"><br>
-<b>Alerts</b> for volume, brightness, Caps Lock, charging, low battery, Bluetooth devices with their battery, going offline, reminders, meetings about to start, AI plan limits and GNOME notifications with their buttons, in the same place instead of the middle of the screen. Hold the pointer on one to keep it, with a × on its icon to put it away (or swipe up). Icons drawn in SF Symbols' manner move once as they appear: the bolt pulses, the bell sways, rings sweep and count up.
+<b>Alerts</b> for volume, brightness, Caps Lock, charging, low battery, Bluetooth devices with their battery, going offline, reminders, meetings about to start, AI plan limits and GNOME notifications with their buttons, in the same place instead of the middle of the screen. Hold the pointer on one to keep it, with a × on its icon to put it away (or swipe up). Isle's own icons move once as they appear: the bolt pulses, the bell sways, rings sweep and count up.
 </td>
 <td width="50%" valign="top">
 <img src="docs/images/approvals.png" alt="Claude Code asking to run npm run build, with Deny, Allow and Always; then Allowed" width="100%"><br>
@@ -132,7 +132,7 @@ appear in the same place instead of in the middle of the screen.
 </tr>
 <tr>
 <td width="50%" valign="top">
-<img src="docs/images/apps.png" alt="Apps page: Brave Web Browser, Visual Studio Code, Spotify and Files with their times today" width="100%"><br>
+<img src="docs/images/apps.png" alt="Apps page: Brave Web Browser, Visual Studio Code, Ghostty and Discord with their times today" width="100%"><br>
 <b>App usage.</b> Where your time goes: the application in front today, over the last seven days, or the last 30, with its icon, a bar and its time. Off until you turn it on, it times the app in front even when you are not typing or clicking; five idle minutes pause it unless a video holds the session awake, and locking the screen stops it. Kept on this computer for 30 days.
 </td>
 </tr>
@@ -253,7 +253,7 @@ cd isle
 | Do this | To |
 |---|---|
 | Rest the pointer on the notch | Open the island (or click it, if Settings say so) |
-| Click a tab, or swipe sideways with two fingers | Switch pages |
+| Click a tab | Switch pages |
 | Move the pointer away, or press Esc | Close it |
 | Click the notch | Open it now; on an alert, open what it is about |
 | Middle-click the notch | Play or pause |
@@ -283,8 +283,9 @@ stops, a warning shows in the closed island; click it to start it again.
 Click the gear right of the clock in the open island (or Isle's gear in the
 **Extensions** app):
 
-- **Island:** the top bar on a slider from glass (default) to black, the
-  island itself always black; which pages the open island has (Music,
+- **Island:** Isle's own black island, or Glass: dark glass that shows what
+  is behind it (windows and wallpaper) blurred, as GNOME's menus look with
+  Blur my Shell; the top bar on a slider from glass (default) to black; which pages the open island has (Music,
   Notifications, Focus, Reminders, Shelf, Calendar, Apps, AI Usage) and whether it
   has the AI assistant at all; world clocks, and their cities;
   the closed island inside the bar or hanging below it; with more than one
@@ -391,7 +392,7 @@ after 10 minutes, and a command is stopped after 30.
    `isle-setup-voice --remove-old`.
 3. Pick the AI in **Settings → Assistant**, or leave it on Automatic, which
    uses the first one you are signed in to: Claude Code, then Codex, then
-   Antigravity. An AI installed later is found by itself.
+   Grok, then Antigravity. An AI installed later is found by itself.
 4. Check with `~/.local/bin/isled --doctor` (`isled --doctor` with a
    package): it lists speech recognition (the models
    downloaded, and the GPU or processor it runs on) and each AI, where it is
@@ -623,6 +624,16 @@ and [CHANGELOG.md](CHANGELOG.md) for what changed. Everyone taking part
 follows the [Code of Conduct](CODE_OF_CONDUCT.md); please report security
 problems privately as described in [SECURITY.md](SECURITY.md).
 
+### Contributors
+
+Thanks to everyone who has made Isle better:
+
+- [@caffeinepx](https://github.com/caffeinepx): Grok in the voice assistant
+  and on the AI usage page; music from Zen and Firefox that keeps its place;
+  a sun or a moon by each World Clock.
+- [@Ashishranjan980](https://github.com/Ashishranjan980): the Apps page, where
+  your time in each app goes.
+
 ## Support
 
 Isle is free and always will be. If it makes your desktop nicer, you can
@@ -648,7 +659,9 @@ come from [Simple Icons](https://simpleicons.org) (CC0); they are trademarks of
 Anthropic and OpenAI, shown only to name their plans. The assistant's face
 takes its expressions from [bloub](https://github.com/jeremy-prt/bloub) by
 Jérémy Perret, under the MIT License
-([notice](gnome-extension/NOTICE-bloub.txt)).
+([notice](gnome-extension/NOTICE-bloub.txt)). The calendar icon takes its shape
+from [Lucide](https://lucide.dev)'s "calendar-days", under the ISC License
+([notice](gnome-extension/NOTICE-lucide.txt)).
 
 The demo video shows "Clouds" by Tibor Mokanszki from the Ubuntu 24.04
 wallpapers, under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/);

@@ -11,6 +11,7 @@ mod calendar;
 mod caller;
 mod clipboard;
 mod clock;
+mod eds;
 mod http;
 mod login_env;
 mod media;
@@ -62,9 +63,31 @@ Usage: isled [--version | --doctor | --report | --unhook-all | --help]
 
 Claude Code and Codex run `isled --agent-hook claude|codex` themselves, once their alerts are on.";
 
+/// glibc keeps freed memory to use again, so one big picture or download held isled's memory up for
+/// good: big blocks go back to the system once freed, and one pool serves both threads.
+#[cfg(target_env = "gnu")]
+fn keep_heap_small() {
+    const BIG: libc::c_int = 64 * 1024;
+    // SAFETY: tuning glibc's allocator, before any thread but this one exists.
+    unsafe {
+        libc::mallopt(libc::M_ARENA_MAX, 1);
+        libc::mallopt(libc::M_MMAP_THRESHOLD, BIG);
+        libc::mallopt(libc::M_TRIM_THRESHOLD, BIG);
+    }
+}
+
 /// Runs the service, or one of the command-line tools in `HELP`.
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
+    #[cfg(target_env = "gnu")]
+    keep_heap_small();
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?
+        .block_on(run())
+}
+
+/// The service, or a command-line tool, on the runtime `main` made.
+async fn run() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args_os()
         .map(|arg| arg.to_string_lossy().into_owned())
         .collect();
@@ -126,8 +149,9 @@ async fn main() -> anyhow::Result<()> {
     let (assistant, assistant_commands) = AssistantService::new();
     let (usage, usage_refresh) = UsageService::new();
     let (updates, updates_wake) = UpdatesService::new();
+    let (media, media_wishes) = MediaService::new();
     let server = session.object_server();
-    server.at(OBJECT_PATH, MediaService::default()).await?;
+    server.at(OBJECT_PATH, media).await?;
     server.at(OBJECT_PATH, PomodoroService::load()).await?;
     server.at(OBJECT_PATH, TodoService::load()).await?;
     server.at(OBJECT_PATH, ShelfService::load()).await?;
@@ -153,15 +177,20 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(updates::run(updates, updates_wake));
     let agents = server.interface::<_, AgentsService>(OBJECT_PATH).await?;
     tokio::spawn(agents::watch(agents));
+    tokio::spawn(shelf::prune(
+        server.interface::<_, ShelfService>(OBJECT_PATH).await?,
+    ));
+    let calendar = server.interface::<_, CalendarService>(OBJECT_PATH).await?;
+    tokio::spawn(calendar::send_waiting(calendar.clone(), session.clone()));
     let own_data = assistant::Sources {
         todo: todo.clone(),
-        calendar: server.interface::<_, CalendarService>(OBJECT_PATH).await?,
+        calendar,
         reminders: server.interface::<_, RemindersService>(OBJECT_PATH).await?,
     };
 
     let session_for_media = session.clone();
     tokio::spawn(async move {
-        if let Err(err) = media::watch(session_for_media, media).await {
+        if let Err(err) = media::watch(session_for_media, media, media_wishes).await {
             warn!("media monitoring stopped: {err}");
         }
     });

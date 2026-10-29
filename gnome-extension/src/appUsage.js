@@ -40,6 +40,9 @@ export class AppUsage {
         this._reportTimer = 0;
         this._sessionProxy = null;
         this._sessionProxyId = 0;
+        this._sessionCancel = null;
+        /** Bumped by `clear`, so a report that failed before it is not put back after. */
+        this._generation = 0;
     }
 
     get enabled() {
@@ -137,25 +140,35 @@ export class AppUsage {
         this._watchActive();
     }
 
-    /** Watches the session's inhibitors: a video player holds the session's idle flag. */
+    /** Watches the session's inhibitors: a video player holds the session's idle flag. Asked without
+     * waiting, so a busy session manager never holds up the shell. */
     _watchInhibitor() {
-        try {
-            this._sessionProxy = Gio.DBusProxy.new_sync(Gio.DBus.session, Gio.DBusProxyFlags.NONE, null,
-                'org.gnome.SessionManager', '/org/gnome/SessionManager',
-                'org.gnome.SessionManager', null);
-        } catch (e) {
-            // No session manager (a test shell): nothing holds the session, so idle pauses as usual.
-            this._sessionProxy = null;
-            return;
-        }
-        this._sessionProxyId = this._sessionProxy.connect('g-properties-changed', (_proxy, changed) => {
-            if ('InhibitedActions' in changed.unpack())
+        const cancel = this._sessionCancel = new Gio.Cancellable();
+        Gio.DBusProxy.new(Gio.DBus.session, Gio.DBusProxyFlags.NONE, null, 'org.gnome.SessionManager',
+            '/org/gnome/SessionManager', 'org.gnome.SessionManager', cancel, (_source, res) => {
+                let proxy;
+                try {
+                    proxy = Gio.DBusProxy.new_finish(res);
+                } catch (e) {
+                    // No session manager (a test shell), or timing stopped first: idle pauses as usual.
+                    return;
+                }
+                if (cancel.is_cancelled()) {
+                    proxy.run_dispose();
+                    return;
+                }
+                this._sessionProxy = proxy;
+                this._sessionProxyId = proxy.connect('g-properties-changed', (_proxy, changed) => {
+                    if ('InhibitedActions' in changed.unpack())
+                        this._syncInhibited();
+                });
                 this._syncInhibited();
-        });
-        this._syncInhibited();
+            });
     }
 
     _unwatchInhibitor() {
+        this._sessionCancel?.cancel();
+        this._sessionCancel = null;
         if (this._sessionProxy && this._sessionProxyId)
             this._sessionProxy.disconnect(this._sessionProxyId);
         this._sessionProxy?.run_dispose();
@@ -207,19 +220,31 @@ export class AppUsage {
     _flush() {
         if (!this._daemon.running || this._reports.size === 0)
             return Promise.resolve();
-        const stretches = this._reports.take().map(({id, name, start, ms}) => [id, name, start, ms]);
-        return (this._pending = this._daemon.call('appUsage', 'Report', stretches));
+        const taken = this._reports.take();
+        const generation = this._generation;
+        const stretches = taken.map(({id, name, start, ms}) => [id, name, start, ms]);
+        return (this._pending = this._daemon.attemptQuietly('appUsage', 'Report', stretches).then(({result, error,
+            unknownMethod}) => {
+            if (!result && error)
+                console.warn(`Isle: app usage report refused: ${error}`);
+            // isled went away mid-call, or one from before App usage runs until the next login: kept for the
+            // isled that takes them, unless cleared meanwhile.
+            if (!result && (unknownMethod || !this._daemon.running) && generation === this._generation)
+                this._reports.restore(taken);
+        }));
     }
 
-    /** Forgets what is recorded, then goes on timing the app in front. */
+    /** Forgets what is recorded, then goes on timing the app in front; whether isled forgot it. */
     async clear() {
+        this._generation++;
         this._session.end();
         this._reports.clear();
         // A report already on its way would come back after the clear: wait for it to land first.
         await this._pending;
-        await this._daemon.call('appUsage', 'Clear');
+        const cleared = await this._daemon.call('appUsage', 'Clear');
         if (this._enabled && this._canTime())
             this._reports.add(this._session.switchTo(this._focusedApp()));
+        return Boolean(cleared);
     }
 
     /** The app in front now as {id, name}, or null when no window has focus. */
@@ -227,15 +252,13 @@ export class AppUsage {
         const app = Shell.WindowTracker.get_default().focus_app;
         if (!app)
             return null;
-        const name = app.get_name() ?? '';
-        let id = app.get_id() ?? '';
-        if (!id) {
-            // A window without a desktop file: its WM class is steady between runs.
-            const window = global.display.focus_window;
-            const wmClass = window?.get_wm_class_instance?.() || window?.get_wm_class?.() || '';
-            id = wmClass ? `window:${wmClass}` : name ? `app:${name}` : '';
-        }
-        return id ? {id, name: name || id} : null;
+        const id = app.get_id() ?? '';
+        if (id && !/^window:\d+$/.test(id))
+            return {id, name: app.get_name() ?? ''};
+        // No desktop file: GNOME's "window:N" changes each run and its name is the window's title, so the
+        // WM class names it instead, steady between runs and with no document's title kept on disk.
+        const wmClass = global.display.focus_window?.get_wm_class() ?? '';
+        return wmClass ? {id: `window:${wmClass}`, name: wmClass.split('.').at(-1) || wmClass} : null;
     }
 
     /** Stops timing and sends the last stretch. */
