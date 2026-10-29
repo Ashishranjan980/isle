@@ -117,7 +117,17 @@
     <key name="hidden-pages" type="as">
       <default>[]</default>
       <summary>Pages left out of the island</summary>
-      <description>Names of the open island’s pages that have no tab: music, notifications, focus, reminders, shelf, calendar.</description>
+      <description>Names of the open island’s pages that have no tab: music, notifications, focus, reminders, shelf, calendar, apps. A page left out takes what it alone does with it: the Apps page stops timing app usage.</description>
+    </key>
+    <key name="app-usage" type="b">
+      <default>false</default>
+      <summary>Time the application in front</summary>
+      <description>The Apps page times the application in front, whether or not there is keyboard or pointer input, and keeps 30 days on this computer. Time pauses after five idle minutes, unless a video or another program holds the session awake. Off until you turn it on.</description>
+    </key>
+    <key name="app-usage-clear" type="b">
+      <default>false</default>
+      <summary>Clear app usage once</summary>
+      <description>Settings asks the island to forget the app usage; the island resets this to false when it has.</description>
     </key>
     <key name="agent-alerts-claude" type="b">
       <default>true</default>

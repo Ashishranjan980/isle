@@ -142,6 +142,26 @@ when it is due, then dismisses it.
 | `Dismiss(t id)` | | Forgets one, once shown (or cancelled). |
 | `Items` | `s` | `[{id, text, due_ms}]`, soonest first. |
 
+## io.github.zickrian.isle.AppUsage1
+
+Time spent in each application, timed by the extension as GNOME's focus
+changes and kept in `~/.local/share/isle/app-usage.json` for 30 days. Only
+the application in front is timed, whether or not there is keyboard or
+pointer input; it stops when focus moves, when no window is in front, or
+when the screen locks. Five minutes without input pause it too, unless a
+program holds the session from going idle (a video playing does). The
+extension keeps the stretches and reports them at most once a minute, when
+the Apps page opens and when timing stops; turning the Apps page or its
+switch in Settings off stops the timing.
+
+Every method is GNOME Shell's: the history names every app the user ran.
+
+| Member | Signature | |
+|---|---|---|
+| `Report(a(ssxx) stretches)` | | Adds timed stretches, each `(app_id, name, start_ms, ms)`: `app_id` is the desktop id (or `window:<wmclass>` when the app has no desktop file), `start_ms` when the stretch began in milliseconds since the Unix epoch, and `ms` how long it lasted. Stretches past local midnight are split between the days. At most 1,000 fit in one call; a blank id, a start before 1970, or a time not between 1 ms and 24 hours refuses the whole batch with `InvalidArgs`. |
+| `GetStats() → s` | | `{today: [{id, name, ms}], week: [{id, name, ms}], month: [{id, name, ms}]}`, most used first; `week` is the last seven days including today, and `month` the last 30 (all that is kept). |
+| `Clear()` | | Forgets every day. |
+
 ## io.github.zickrian.isle.Assistant1
 
 The voice assistant. isled records the microphone, turns speech into text

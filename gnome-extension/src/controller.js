@@ -16,6 +16,7 @@ import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 
 import {namesProject} from './actionRules.js';
 import * as Alerts from './alerts.js';
+import {AppUsage} from './appUsage.js';
 import {paletteFor} from './bot.js';
 import {ClipboardHistory} from './clipboard.js';
 import {CompactView} from './compact.js';
@@ -33,6 +34,7 @@ import {PeekView} from './peek.js';
 import * as Playback from './playback.js';
 import {KeyboardWatcher, OsdHook, TopBar} from './shell.js';
 import {ShelfHelper} from './shelfHelper.js';
+import {AppsPage} from './pages/apps.js';
 import {CallPage} from './pages/call.js';
 import {CalendarPage} from './pages/calendar.js';
 import {MediaPage} from './pages/media.js';
@@ -240,6 +242,7 @@ export class Controller {
         this._audio = new AudioOutputs();
         this._focusMode = new FocusMode(this._daemon, this._notifications, this._settings);
         this._clipboard = new ClipboardHistory(this._daemon, this._settings);
+        this._appUsage = new AppUsage(this._daemon);
         this._writer = new TextWriter(this._clipboard);
     }
 
@@ -348,6 +351,7 @@ export class Controller {
             () => new TasksPage(this._daemon, size),
             () => new ShelfPage(this._daemon, this._clipboard, this._settings, size),
             () => new CalendarPage(this._daemon, size),
+            () => new AppsPage(this._daemon, this._appUsage, size),
             () => new UsagePage(this._daemon, size),
         ];
     }
@@ -455,6 +459,8 @@ export class Controller {
             this._settingsChanged.push(this._settings.connect(`changed::${key}`, () => this._syncEventAlerts()));
         for (const key of ['hidden-pages', 'world-clocks'])
             this._settingsChanged.push(this._settings.connect(`changed::${key}`, () => this._syncPages()));
+        for (const key of ['app-usage', 'app-usage-clear'])
+            this._settingsChanged.push(this._settings.connect(`changed::${key}`, () => this._syncAppUsage()));
         for (const provider of AGENT_PROVIDERS) {
             this._settingsChanged.push(this._settings.connect(`changed::agent-alerts-${provider}`, () =>
                 this._hookAgent(provider)));
@@ -720,7 +726,19 @@ export class Controller {
         }
         this._syncUnseen();
         this._syncLyrics();
+        this._syncAppUsage();
         this._expanded.pageNamed('calendar').worldClocks = this._settings.get_boolean('world-clocks');
+    }
+
+    /** Times the app in front only while its switch and the Apps page are both on; clears when asked. */
+    _syncAppUsage() {
+        const hidden = this._settings.get_strv('hidden-pages');
+        this._appUsage.enabled = this._settings.get_boolean('app-usage') && !hidden.includes('apps');
+        if (!this._settings.get_boolean('app-usage-clear'))
+            return;
+        // Settings cannot call isled's shell-only Clear; it leaves this request for the island.
+        this._settings.set_boolean('app-usage-clear', false);
+        this._appUsage.clear().then(() => this._expanded?.pageNamed('apps')?.refresh());
     }
 
     /** Lyrics are looked up online only for the Music page, and only while it is in the island. */
@@ -2380,6 +2398,7 @@ export class Controller {
         this._island.destroy();
         this._writer.destroy();
         this._installedApps.destroy();
+        this._appUsage.destroy();
         this._clipboard.destroy();
         this._call.destroy();
         this._privacy.destroy();
@@ -2444,7 +2463,7 @@ export class Controller {
                 this._pages.forEach(page => page.destroy());
         }
         this._island?.destroy();
-        for (const service of [this._topBar, this._writer, this._clipboard, this._focusMode, this._call,
+        for (const service of [this._topBar, this._writer, this._appUsage, this._clipboard, this._focusMode, this._call,
             this._privacy, this._audio, this._notifications, this._daemon])
             service?.destroy();
         this._settings = null;

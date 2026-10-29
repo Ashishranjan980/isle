@@ -334,6 +334,7 @@ export default class IslePreferences extends ExtensionPreferences {
         look.add(delay);
         page.add(look);
         page.add(pagesGroup(settings, window));
+        page.add(appUsageGroup(settings, window));
         page.add(worldClocksGroup(settings, window));
 
         const alerts = new Adw.PreferencesGroup({title: 'Alerts'});
@@ -748,6 +749,7 @@ const PAGES = [
     ['reminders', 'Reminders', 'object-select-symbolic', 'Your to-do list'],
     ['shelf', 'Shelf', 'edit-paste-symbolic', 'Clipboard history (Super+V) and the files tray'],
     ['calendar', 'Calendar', 'x-office-calendar-symbolic', 'The month, its events and world clocks'],
+    ['apps', 'Apps', 'view-app-grid-symbolic', 'Time spent in each application, today, over the last 7 days or the last 30'],
 ];
 
 /** A switch per page; the last one on can't be turned off, so the island always has a page. */
@@ -794,6 +796,26 @@ function pagesGroup(settings, window) {
         return false;
     });
     sync();
+    return group;
+}
+
+/** Times the app in front, if asked to; forgets what is kept when Settings asks. */
+function appUsageGroup(settings, window) {
+    const group = new Adw.PreferencesGroup({
+        title: 'App Usage',
+        description: 'Off until you turn it on. Kept on this computer for 30 days.',
+    });
+    group.add(switchRow(settings, 'app-usage', 'Track app usage',
+        'Time the application in front, even without input; five idle minutes pause it unless a video holds the session awake'));
+    const clear = new Adw.ActionRow({title: 'Clear app usage', subtitle: 'Forget every day recorded so far'});
+    const button = new Gtk.Button({label: 'Clear…', valign: Gtk.Align.CENTER});
+    button.connect('clicked', () => confirm(window, {
+        heading: 'Clear app usage?',
+        body: 'Every app\'s time recorded so far is removed. This cannot be undone.',
+        action: 'Clear',
+    }, () => settings.set_boolean('app-usage-clear', true)));
+    clear.add_suffix(button);
+    group.add(clear);
     return group;
 }
 

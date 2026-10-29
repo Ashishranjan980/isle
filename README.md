@@ -5,8 +5,8 @@
 **A notch-style island for the GNOME desktop.**
 
 Music with synced lyrics, calls, notifications, a focus timer, reminders, a
-calendar that tells you when to join a meeting, a clipboard shelf, Claude
-Code and Codex asking you right there, and an assistant that installs and
+calendar that tells you when to join a meeting, a clipboard shelf, app usage,
+Claude Code and Codex asking you right there, and an assistant that installs and
 fixes things with the AI you already use, living in a notch at the top of
 your screen.
 
@@ -128,6 +128,12 @@ appear in the same place instead of in the middle of the screen.
 <td width="50%" valign="top">
 <img src="docs/images/approvals.png" alt="Claude Code asking to run npm run build, with Deny, Allow and Always; then Allowed" width="100%"><br>
 <b>AI agents.</b> When Claude Code or Codex asks permission to run something, answer from the island: <b>Deny</b>, <b>Allow</b> or, for Claude Code, <b>Always</b>. When one is done, the island says what it did. Nothing shows while you are in its window, and answering in its terminal works as before.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/images/apps.png" alt="Apps page: Brave Web Browser, Visual Studio Code, Spotify and Files with their times today" width="100%"><br>
+<b>App usage.</b> Where your time goes: the application in front today, over the last seven days, or the last 30, with its icon, a bar and its time. Off until you turn it on, it times the app in front even when you are not typing or clicking; five idle minutes pause it unless a video holds the session awake, and locking the screen stops it. Kept on this computer for 30 days.
 </td>
 </tr>
 </table>
@@ -279,7 +285,7 @@ Click the gear right of the clock in the open island (or Isle's gear in the
 
 - **Island:** the top bar on a slider from glass (default) to black, the
   island itself always black; which pages the open island has (Music,
-  Notifications, Focus, Reminders, Shelf, Calendar, AI Usage) and whether it
+  Notifications, Focus, Reminders, Shelf, Calendar, Apps, AI Usage) and whether it
   has the AI assistant at all; world clocks, and their cities;
   the closed island inside the bar or hanging below it; with more than one
   display, on the main one or the one you are using; opening when the
@@ -511,10 +517,11 @@ camera or the microphone itself.
 ## Data & network
 
 Isle has no server and no telemetry; your clipboard history, reminders,
-events, timer and the assistant's chats stay in `~/.local/share/isle`, and
-speech is recognised on this computer. It goes online only for synced lyrics
-([LRCLIB](https://lrclib.net)) and cover art, once per song (lyrics can be
-turned off in Settings); your Claude plan's usage (`api.anthropic.com`, with
+events, timer, app usage and the assistant's chats stay in
+`~/.local/share/isle`, and speech is recognised on this computer. It goes
+online only for synced lyrics ([LRCLIB](https://lrclib.net)) and cover art,
+once per song (lyrics can be turned off in Settings); your Claude plan's
+usage (`api.anthropic.com`, with
 Claude Code's own sign-in); a look for a newer Isle on GitHub at most once a
 day (also in Settings); the speech model, downloaded once from Hugging Face
 when you set up voice; and the voice assistant, whose requests go to the AI

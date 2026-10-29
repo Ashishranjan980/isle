@@ -5,6 +5,7 @@
 //! See `docs/dbus-api.md` for the interfaces.
 
 mod agents;
+mod app_usage;
 mod assistant;
 mod calendar;
 mod caller;
@@ -32,6 +33,7 @@ use zbus::connection;
 use zbus::fdo::{DBusProxy, RequestNameFlags, RequestNameReply};
 
 use crate::agents::AgentsService;
+use crate::app_usage::AppUsageService;
 use crate::assistant::AssistantService;
 use crate::calendar::CalendarService;
 use crate::clipboard::ClipboardService;
@@ -133,6 +135,7 @@ async fn main() -> anyhow::Result<()> {
     server.at(OBJECT_PATH, CalendarService::load()).await?;
     server.at(OBJECT_PATH, RemindersService::load()).await?;
     server.at(OBJECT_PATH, SystemService::default()).await?;
+    server.at(OBJECT_PATH, AppUsageService::load()).await?;
     server.at(OBJECT_PATH, assistant).await?;
     server.at(OBJECT_PATH, usage).await?;
     server.at(OBJECT_PATH, updates).await?;
@@ -142,6 +145,7 @@ async fn main() -> anyhow::Result<()> {
     let pomodoro = server.interface::<_, PomodoroService>(OBJECT_PATH).await?;
     let todo = server.interface::<_, TodoService>(OBJECT_PATH).await?;
     let system = server.interface::<_, SystemService>(OBJECT_PATH).await?;
+    let app_usage = server.interface::<_, AppUsageService>(OBJECT_PATH).await?;
     let assistant = server.interface::<_, AssistantService>(OBJECT_PATH).await?;
     let usage = server.interface::<_, UsageService>(OBJECT_PATH).await?;
     tokio::spawn(usage::run(usage, usage_refresh));
@@ -162,6 +166,7 @@ async fn main() -> anyhow::Result<()> {
         }
     });
     tokio::spawn(todo::run(todo));
+    tokio::spawn(app_usage::run(app_usage));
     tokio::spawn(assistant::run(assistant, own_data, assistant_commands));
 
     match zbus::Connection::system().await {

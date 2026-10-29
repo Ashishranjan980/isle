@@ -1010,6 +1010,20 @@
 .isle-usage-dot:hover { background-color: rgba(255, 255, 255, 0.45); }
 .isle-usage-dot.shown { height: 16px; background-color: #ffffff; }
 
+/* Apps: time in each application, today or over the last seven days */
+
+.isle-apps-bar { spacing: 10px; padding: 0 8px 6px 8px; }
+.isle-apps-heading { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.6); }
+.isle-apps-total { font-size: 11px; color: rgba(255, 255, 255, 0.45); }
+.isle-apps-toggle .isle-segment { padding: 3px 9px; font-size: 11px; }
+.isle-apps-scroll { padding: 2px 0 6px 0; -st-vfade-offset: 16px; }
+.isle-apps-list { spacing: 8px; }
+.isle-apps-row { spacing: 10px; }
+.isle-apps-name { font-size: 13px; color: rgba(255, 255, 255, 0.92); }
+.isle-apps-track { width: 120px; height: 4px; border-radius: 2px; background-color: rgba(255, 255, 255, 0.1); }
+.isle-apps-fill { height: 4px; border-radius: 2px; background-color: rgba(255, 255, 255, 0.8); }
+.isle-apps-time { font-size: 12px; color: rgba(255, 255, 255, 0.6); min-width: 44px; text-align: right; }
+
 /* Focused (from the keyboard), a button lights up: no ring around it. */
 .isle-pill:focus, .isle-pill-small:focus, .isle-notification-row:focus, .isle-output-button:focus,
 .isle-cal-today:focus, .isle-cal-month-title:focus, .isle-segment:focus, .isle-usage-dot:focus,
