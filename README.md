@@ -62,7 +62,7 @@ appear in the same place instead of in the middle of the screen.
 </tr>
 <tr>
 <td width="50%" valign="top">
-<img src="docs/images/call.png" alt="A Google Meet call in the island: a live preview of the call, its length, mute and open" width="100%"><br>
+<img src="docs/images/call.png" alt="A Google Meet call in the island: its length, mute and open" width="100%"><br>
 <b>Calls</b> in WhatsApp, Telegram, Meet or any app or browser: the closed island shows a green phone and how long the call has lasted. Open it to see the call live (you and whoever you call) while you work in other windows, mute your microphone, or jump back to the call.
 </td>
 <td width="50%" valign="top">
@@ -72,7 +72,7 @@ appear in the same place instead of in the middle of the screen.
 </tr>
 <tr>
 <td width="50%" valign="top">
-<img src="docs/images/reminders.png" alt="Reminders page: a list with a long reminder wrapped over two lines" width="100%"><br>
+<img src="docs/images/reminders.png" alt="Reminders page: four reminders, one of them long" width="100%"><br>
 <b>Reminders</b>, a plain list: add, rename in place, tick one off and it is struck through, then goes. A long one wraps over as many lines as it needs.
 </td>
 <td width="50%" valign="top">
@@ -82,7 +82,7 @@ appear in the same place instead of in the middle of the screen.
 </tr>
 <tr>
 <td width="50%" valign="top">
-<img src="docs/images/files.png" alt="The files tray with a photo, a PDF and a text file" width="100%"><br>
+<img src="docs/images/files.png" alt="The files tray with three pictures and a PDF" width="100%"><br>
 <b>Files tray.</b> Files dropped on the island wait here, with their thumbnails, until you drag them into an app or click one to copy it.
 </td>
 <td width="50%" valign="top">
@@ -96,7 +96,7 @@ appear in the same place instead of in the middle of the screen.
 <b>Notifications.</b> GNOME's notifications collect here as a plain list, newest first, with their buttons ("Reply", "Mark as read") under the pointer, Clear, and Do Not Disturb a click away.
 </td>
 <td width="50%" valign="top">
-<img src="docs/images/voice.png" alt="The voice assistant working through a request in steps: finding Spotify, opening it, playing jazz, setting the volume" width="100%"><br>
+<img src="docs/images/voice.png" alt="The voice assistant at work: what it heard, and the step it is on, finding jazz on Spotify" width="100%"><br>
 <b>Voice assistant.</b> Press Super+I and ask, in English or Indonesian: play a song, find a file, put windows side by side, add a reminder, explain why the laptop is slow. It works as an agent: a request with several steps is done one after another, each step checked, with the AI you already use (Claude Code, Codex, Grok or Antigravity).
 </td>
 </tr>
@@ -106,7 +106,7 @@ appear in the same place instead of in the middle of the screen.
 <b>Installs and fixes things.</b> "Install LibreOffice", "pasang codex": it checks what your Linux has, searches the web when unsure, and shows the one command it wants to run, with what to know (your password, a script from the web, removing files). Press <b>Run</b> or <b>Deny</b>. It runs in the background while you carry on, and the assistant checks it worked before saying so.
 </td>
 <td width="50%" valign="top">
-<img src="docs/images/conversation.png" alt="The conversation: install vlc, the command that ran with Done, and the answer, with + and the field to type in" width="100%"><br>
+<img src="docs/images/conversation.png" alt="The conversation: install vlc, the command that ran with its time, and the answer" width="100%"><br>
 <b>Speak or type, and talk it through.</b> It listens as soon as it opens; start typing to type instead. Scroll up for the conversation so far; select text to copy it, + for a new one. The bot turns to the pointer, blinks, bounces with your voice and changes expression as it thinks and answers, and the light round the edge rises as you speak. Close the island and it carries on in the background.
 </td>
 </tr>
@@ -134,6 +134,10 @@ appear in the same place instead of in the middle of the screen.
 <td width="50%" valign="top">
 <img src="docs/images/apps.png" alt="Apps page: Brave Web Browser, Visual Studio Code, Ghostty and Discord with their times today" width="100%"><br>
 <b>App usage.</b> Where your time goes: the application in front today, over the last seven days, or the last 30, with its icon, a bar and its time. Off until you turn it on, it times the app in front even when you are not typing or clicking; five idle minutes pause it unless a video holds the session awake, and locking the screen stops it. Kept on this computer for 30 days.
+</td>
+<td width="50%" valign="top">
+<img src="docs/images/glass.png" alt="The music page in the glass island, the wallpaper behind it showing through, blurred" width="100%"><br>
+<b>Glass.</b> The island in dark glass instead of black, if you prefer: what is behind it shows through, blurred, as you work. Choose it in Settings → Island → Appearance.
 </td>
 </tr>
 </table>
