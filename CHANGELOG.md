@@ -6,6 +6,12 @@ All notable changes to Isle are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The Focus timer's Work and Break lengths can be typed directly: click the minutes, type a
+  number, and Enter or a click elsewhere keeps it (Esc restores the old length). The − and +
+  buttons still step a minute at a time.
+
 ## [1.5.0] - 2026-10-29
 
 A glass look for the island, an Apps page for your screen time (thanks to @Ashishranjan980), events

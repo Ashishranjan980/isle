@@ -10,6 +10,7 @@ import St from 'gi://St';
 import {timerColor} from '../compact.js';
 import {VERTICAL, onUiScale} from '../compat.js';
 import * as Format from '../format.js';
+import {typedMinutes} from '../timerRules.js';
 import {Ring, icon, iconButton, label} from '../widgets.js';
 import {Page} from './page.js';
 
@@ -87,12 +88,51 @@ class TimerPage extends Page {
         this._syncSteppers();
     }
 
-    /** "Work  25  −  +": a length, and buttons a minute down or up. */
+    /** "Work  25  −  +": a length to type, and buttons a minute down or up. */
     _buildStepper({key, label: name, min, max}) {
         const row = new St.BoxLayout({style_class: 'isle-stepper'});
         row.add_child(label(name, 'isle-stepper-name'));
-        const value = label('', 'isle-stepper-value');
+        // The number is a field: click it, type a length, Enter or a click away keeps it. The
+        // buttons still step a minute, which stays quicker for a small change.
+        const value = new St.Entry({
+            style_class: 'isle-stepper-value isle-stepper-entry',
+            text: '',
+            can_focus: true,
+            y_align: Clutter.ActorAlign.CENTER,
+            accessible_name: `Set ${name.toLowerCase()} minutes`,
+        });
         this._values.set(key, value);
+        const text = value.clutter_text;
+        text.x_align = Clutter.ActorAlign.END;
+        // Ask for the keyboard before the field takes it: the grab moves focus itself.
+        text.connect('button-press-event', () => {
+            this.emit('request-keyboard', true);
+            return Clutter.EVENT_PROPAGATE;
+        });
+        text.connect('key-focus-in', () => text.set_selection(0, -1));
+        text.connect('activate', () => {
+            this._saveValue(key, value, min, max);
+            this._giveKeyboardBack();
+        });
+        // Clicking elsewhere keeps the typed length, as renaming a reminder does.
+        text.connect('key-focus-out', () => this._saveValue(key, value, min, max));
+        text.connect('key-press-event', (_text, event) => {
+            if (event.get_key_symbol() !== Clutter.KEY_Escape)
+                return Clutter.EVENT_PROPAGATE;
+            this._cancelValue(key, value);
+            this._giveKeyboardBack();
+            return Clutter.EVENT_STOP;
+        });
+        // Digits only, at most those of the largest length (three): letters never reach isled.
+        text.connect('text-changed', () => {
+            if (!text.has_key_focus())
+                return;
+            const digits = text.text.replace(/\D/g, '').slice(0, 3);
+            if (digits !== text.text) {
+                text.set_text(digits);
+                text.set_cursor_position(-1);
+            }
+        });
         row.add_child(value);
         for (const [glyph, step, accessibleName] of [['isle-minus-symbolic', -1, `Shorter ${name.toLowerCase()}`],
             ['isle-plus-symbolic', 1, `Longer ${name.toLowerCase()}`]]) {
@@ -109,12 +149,46 @@ class TimerPage extends Page {
         if (!config)
             return;
         const minutes = Math.min(max, Math.max(min, (config[key] ?? min) + step));
+        this._setMinutes(key, minutes);
+    }
+
+    /** Keeps a typed length, within the stepper's limits. */
+    _saveValue(key, value, min, max) {
+        const minutes = typedMinutes(value.text, min, max);
+        if (minutes === null) {
+            this._showValue(key, value);
+            return;
+        }
+        this._setMinutes(key, minutes);
+    }
+
+    /** Puts back the length isled has on Esc. */
+    _cancelValue(key, value) {
+        this._showValue(key, value);
+    }
+
+    /** A length from this page, as isled will hold it; the field shows it at once. */
+    _setMinutes(key, minutes) {
+        const config = this._asked ?? this.daemon.state.pomodoroConfig;
+        if (!config)
+            return;
+        this._values.get(key).text = String(minutes);
         if (minutes === config[key])
             return;
         this._asked = {...config, [key]: minutes};
-        // Shown at once; isled's answer brings the same.
-        this._values.get(key).text = String(minutes);
         this.daemon.call('pomodoro', 'SetConfig', JSON.stringify(this._asked));
+    }
+
+    /** The length isled holds, or the clicks it hasn't answered yet. */
+    _showValue(key, value) {
+        const shown = this._asked ?? this.daemon.state.pomodoroConfig;
+        value.text = shown?.[key] !== undefined ? String(shown[key]) : '–';
+    }
+
+    /** Ends typing: the keyboard goes back to the island, or to the page's next field. */
+    _giveKeyboardBack() {
+        global.stage.set_key_focus(null);
+        this.emit('request-keyboard', false);
     }
 
     /** Steppers show isled's lengths, or the clicks it hasn't answered yet. */
@@ -123,9 +197,13 @@ class TimerPage extends Page {
         // isled has caught up with the clicks (or another change came): its config holds again.
         if (this._asked && (!config || STEPPERS.every(({key}) => config[key] === this._asked[key])))
             this._asked = null;
-        const shown = this._asked ?? config;
-        for (const {key} of STEPPERS)
-            this._values.get(key).text = shown?.[key] !== undefined ? String(shown[key]) : '–';
+        for (const {key} of STEPPERS) {
+            const value = this._values.get(key);
+            // Not while a length is being typed: its field is the user's until they leave it.
+            if (value.clutter_text.has_key_focus())
+                continue;
+            this._showValue(key, value);
+        }
     }
 
     /** Only once a session has started. */
@@ -175,12 +253,24 @@ class TimerPage extends Page {
     /** The time may be stale after a while off screen. */
     onActivate() {
         this._update();
+        this._syncSteppers();
     }
 
-    /** Forgets unanswered clicks. */
+    /** Forgets unanswered clicks, and settles a length still being typed. */
     onDeactivate() {
+        let saved = false;
+        for (const {key, min, max} of STEPPERS) {
+            const value = this._values.get(key);
+            if (!value.clutter_text.has_key_focus())
+                continue;
+            this._saveValue(key, value, min, max);
+            this._giveKeyboardBack();
+            saved = true;
+        }
         // A click isled refused, or a change from Settings meanwhile: what it holds shows next time.
-        this._asked = null;
+        // A length just typed stays shown until isled answers it.
+        if (!saved)
+            this._asked = null;
         this._syncSteppers();
     }
 });

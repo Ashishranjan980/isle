@@ -252,9 +252,11 @@ it (the island closes). Opening the page marks them seen. Empty: a bell,
 runs (white while focusing, green on a break), the time left inside and the
 phase under it ("Focus", "Short break", "Long break"). In the middle two
 stepper pills, **Work** and **Break**, each with its minutes and − / +
-(Work 1–180, Break 1–60; each click counts, however fast). On the right a
-**Start** pill (Pause while it runs, Resume when paused) with a round reset
-beside it once the timer has started; the controls keep a fixed width, so
+(Work 1–180, Break 1–60; each click counts, however fast). The minutes can
+also be typed: click the number, type a length, and Enter or a click elsewhere
+keeps it, while Esc puts the old one back; it is kept to those limits. On the
+right a **Start** pill (Pause while it runs, Resume when paused) with a round
+reset beside it once the timer has started; the controls keep a fixed width, so
 nothing moves as they change. No glows.
 
 While a focus session runs (paused part way included), Do Not Disturb is on,

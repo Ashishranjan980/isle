@@ -617,6 +617,25 @@
 .isle-stepper { padding: 3px 4px 3px 12px; spacing: 4px; border-radius: 999px; background-color: #1c1c1e; }
 .isle-stepper-name { font-size: 12px; font-weight: 500; color: rgba(255, 255, 255, 0.55); width: 40px; }
 .isle-stepper-value { font-size: 15px; font-weight: 600; letter-spacing: -0.1px; width: 26px; text-align: right; padding-right: 6px; }
+/* The length is a field as well: quiet until the pointer is on it or it is being typed in. */
+#isleIsland .isle-stepper-entry,
+#isleIsland .isle-stepper-entry:hover,
+#isleIsland .isle-stepper-entry:focus,
+#isleIsland .isle-stepper-entry:focus:hover {
+  min-height: 0;
+  padding: 0 6px 0 0;
+  border: none !important;
+  border-radius: 6px;
+  color: #ffffff !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  caret-color: #ffffff;
+  selection-background-color: rgba(255, 255, 255, 0.28);
+  selected-color: #ffffff;
+}
+#isleIsland .isle-stepper-entry:hover { background-color: rgba(255, 255, 255, 0.08) !important; }
+#isleIsland .isle-stepper-entry:focus,
+#isleIsland .isle-stepper-entry:focus:hover { background-color: rgba(255, 255, 255, 0.16) !important; }
 .isle-stepper-button { padding: 6px; border-radius: 999px; color: rgba(255, 255, 255, 0.8); }
 .isle-stepper-button:hover { color: #ffffff; background-color: rgba(255, 255, 255, 0.1); }
 
