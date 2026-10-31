@@ -109,6 +109,7 @@ place, dimmed, so the layout never jumps.
 | Input | Closed / alert | Open |
 |---|---|---|
 | Pointer rests 120 ms (Settings: 60–1000 ms, or click only) | Open on the default page | – |
+| Pointer on the hidden island (Settings: auto-hide) | Fades back in; then as the row above | – |
 | Pointer leaves | – | Close after 300 ms (not while typing or dragging a file) |
 | Click | Open now (an alert opens on its page) | Normal button clicks |
 | Middle-click | Play / pause | Play / pause |
@@ -139,6 +140,11 @@ with the wheel or touchpad and never show a scrollbar.
 - Where it is: on the main display, in its top bar; or (Settings) on the display of the window in use,
   moving there once closed. A display without the top bar has the island hang from its top edge, with
   a header of its own when open, and GNOME's clock comes back to the main top bar meanwhile.
+- Auto-hide (Settings → Appearance, off by default): after the pointer has been off the closed island
+  for the chosen wait (3 s by default), it fades away, clock and activities with it. Moving the pointer
+  to the top centre where it rests, or clicking there, brings it back; alerts, the open island and the
+  assistant still show. With "Only when an app fills the screen" on, it hides only while the app in
+  front is fullscreen or maximized on its display, and stays visible on the desktop.
 - Right slot, first that applies: a warning (Isle's service stopped; a click offers to restart it) →
   the bot, 18 px, in the look chosen, blinking and glancing every few seconds (the assistant works on
   a request or a command runs with the island closed; a click shows it) →
